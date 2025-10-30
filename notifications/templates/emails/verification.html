@@ -1,0 +1,22 @@
+{% extends 'emails/base.html' %}
+
+{% block content %}
+<h2>Здравствуйте, {{ user.first_name }}!</h2>
+
+<p>Спасибо за регистрацию на платформе {{ site_name }}.</p>
+
+<p>Для завершения регистрации и установки пароля, пожалуйста, перейдите по ссылке ниже:</p>
+
+<p style="text-align: center;">
+    <a href="{{ verification_link }}" class="button">Установить пароль</a>
+</p>
+
+<p>Или скопируйте ссылку в браузер:</p>
+<p style="word-break: break-all; color: #7f8c8d;">{{ verification_link }}</p>
+
+<p><strong>Важно:</strong> Ссылка действительна в течение 24 часов.</p>
+
+<p>Если вы не регистрировались на нашей платформе, просто проигнорируйте это письмо.</p>
+
+<p>С уважением,<br>Команда {{ site_name }}</p>
+{% endblock %}
