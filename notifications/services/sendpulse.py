@@ -2,7 +2,10 @@ import requests
 import time
 from typing import Optional, Dict, Any
 from django.conf import settings
+import logging  # ← ДОБАВЬТЕ
 from django.core.cache import cache
+
+logger = logging.getLogger(__name__)  # ← ДОБАВЬТЕ
 
 
 class SendPulseService:
@@ -56,12 +59,7 @@ class SendPulseService:
             from_email: Optional[str] = None,
             from_name: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Отправить email через SendPulse API
-
-        Returns:
-            dict: {'success': bool, 'message': str, 'response': dict}
-        """
+        """Отправить email через SendPulse API"""
         token = self._get_access_token()
         if not token:
             return {
@@ -76,13 +74,24 @@ class SendPulseService:
             'Content-Type': 'application/json',
         }
 
+        sender_email = from_email or settings.SENDPULSE_FROM_EMAIL
+
+        logger.info("=" * 50)
+        logger.info("SendPulse API Request:")
+        logger.info(f"From: {sender_email}")
+        logger.info(f"To: {to_email}")
+        logger.info(f"Subject: {subject}")
+        logger.info(f"API ID: {self.api_id}")
+        logger.info("=" * 50)
+
+        # ПРОСТОЙ PAYLOAD - текст И html
         payload = {
             'email': {
+                'text': html_content,  # ← ДОБАВИЛИ текстовую версию
                 'html': html_content,
                 'subject': subject,
                 'from': {
-                    'name': from_name or settings.SENDPULSE_FROM_NAME,
-                    'email': from_email or settings.SENDPULSE_FROM_EMAIL,
+                    'email': sender_email,
                 },
                 'to': [
                     {
@@ -96,6 +105,8 @@ class SendPulseService:
             response = requests.post(url, json=payload, headers=headers, timeout=15)
             response.raise_for_status()
             result = response.json()
+
+            logger.info(f"SendPulse Success: {result}")
 
             return {
                 'success': True,
@@ -111,6 +122,8 @@ class SendPulseService:
                     error_message = f"{error_message}: {error_data}"
                 except:
                     error_message = f"{error_message}: {e.response.text}"
+
+            logger.error(f"SendPulse Error: {error_message}")
 
             return {
                 'success': False,

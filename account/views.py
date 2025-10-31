@@ -4,7 +4,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
-from django.core.mail import send_mail
+
+from notifications.services import EmailService
+
 from django.conf import settings
 from django.utils import timezone
 
@@ -84,18 +86,7 @@ class RegisterView(APIView):
         token = EmailVerificationToken.objects.create(user=user)
 
         # Отправляем email с ссылкой
-        verification_link = f"{settings.FRONTEND_URL}/set-password?token={token.token}"
-
-        send_mail(
-            subject='Подтверждение регистрации',
-            message=f'Здравствуйте, {user.first_name}!\n\n'
-                    f'Для завершения регистрации и установки пароля перейдите по ссылке:\n'
-                    f'{verification_link}\n\n'
-                    f'Ссылка действительна 24 часа.',
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        EmailService.send_verification_email(user=user, token=token.token)
 
         return Response({
             'message': 'Регистрация успешна. Проверьте email для установки пароля.',
@@ -202,19 +193,7 @@ class PasswordResetRequestView(APIView):
         token = PasswordResetToken.objects.create(user=user)
 
         # Отправляем email со ссылкой
-        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token.token}"
-
-        send_mail(
-            subject='Сброс пароля',
-            message=f'Здравствуйте, {user.first_name}!\n\n'
-                    f'Для сброса пароля перейдите по ссылке:\n'
-                    f'{reset_link}\n\n'
-                    f'Ссылка действительна 1 час.\n\n'
-                    f'Если вы не запрашивали сброс пароля, проигнорируйте это письмо.',
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        EmailService.send_password_reset_email(user=user, token=token.token)
 
         return Response({
             'message': 'Если email существует, на него отправлена ссылка для сброса пароля.'

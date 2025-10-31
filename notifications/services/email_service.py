@@ -1,67 +1,128 @@
 from typing import Optional
-from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
+import logging
 
 from ..models import EmailLog
 from .sendpulse import SendPulseService
+
+logger = logging.getLogger(__name__)
 
 
 class EmailService:
     """Высокоуровневый сервис для отправки email"""
 
-    @staticmethod
-    def _send_email(
-            recipient: str,
-            subject: str,
-            template_name: str,
-            context: dict,
-            email_type: str,
-            user=None
-    ) -> EmailLog:
-        """
-        Универсальный метод отправки email
+    @classmethod
+    def send_verification_email(cls, user, token: str) -> EmailLog:
+        """Отправить письмо для подтверждения email"""
+        verification_link = f"{settings.FRONTEND_URL}/set-password?token={token}"
 
-        Args:
-            recipient: Email получателя
-            subject: Тема письма
-            template_name: Имя шаблона (например, 'emails/verification.html')
-            context: Контекст для шаблона
-            email_type: Тип письма из EmailLog.EMAIL_TYPES
-            user: Объект пользователя (опционально)
+        # ПРОСТОЙ ТЕКСТ
+        text_content = f"""
+        Здравствуйте, {user.first_name}!
 
-        Returns:
-            EmailLog: Объект лога отправки
-        """
-        # Создаем лог
+        Спасибо за регистрацию на платформе Aerialsolutions.kz
+
+        Для завершения регистрации и установки пароля перейдите по ссылке:
+        {verification_link}
+
+        Ссылка действительна 24 часа.
+
+        Если вы не регистрировались - проигнорируйте это письмо.
+
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        С уважением,
+        Команда Aerialsolutions.kz
+
+        Контакты:
+        Email: support@aerialsolutions.kz
+        Сайт: https://aerialsolutions.kz
+
+        Это автоматическое письмо, не отвечайте на него.
+        Если у вас возникли вопросы, напишите на support@aerialsolutions.kz
+            """
+
         email_log = EmailLog.objects.create(
             user=user,
-            recipient=recipient,
-            email_type=email_type,
-            subject=subject,
+            recipient=user.email,
+            email_type='email_verification',
+            subject='Подтверждение регистрации',
             status='pending'
         )
 
         try:
-            # Добавляем общие переменные в контекст
-            context.update({
-                'site_name': settings.SENDPULSE_FROM_NAME,
-                'frontend_url': settings.FRONTEND_URL,
-                'current_year': timezone.now().year,
-            })
+            logger.info(f"Sending email to {user.email}")
+            logger.info(f"Link: {verification_link}")
 
-            # Рендерим HTML из шаблона
-            html_content = render_to_string(template_name, context)
-
-            # Отправляем через SendPulse
             sendpulse = SendPulseService()
             result = sendpulse.send_email(
-                to_email=recipient,
-                subject=subject,
-                html_content=html_content
+                to_email=user.email,
+                subject='Подтверждение регистрации на aerialsolutions.kz',
+                html_content=text_content
             )
 
-            # Обновляем лог
+            if result['success']:
+                email_log.status = 'sent'
+                email_log.sent_at = timezone.now()
+                email_log.sendpulse_response = result.get('response')
+            else:
+                email_log.status = 'failed'
+                email_log.error_message = result['message']
+
+        except Exception as e:
+            email_log.status = 'failed'
+            email_log.error_message = str(e)
+            logger.error(f"Error: {e}")
+
+        email_log.save()
+        return email_log
+
+    @classmethod
+    def send_password_reset_email(cls, user, token: str) -> EmailLog:
+        """Отправить письмо для сброса пароля"""
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+
+        # ПРОСТОЙ ТЕКСТ
+        text_content = f"""
+        Здравствуйте, {user.first_name}!
+
+        Вы запросили сброс пароля на aerialsolutions.kz
+
+        Для сброса пароля перейдите по ссылке:
+        {reset_link}
+
+        Ссылка действительна 1 час.
+
+        Если вы не запрашивали сброс - проигнорируйте это письмо.
+
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        С уважением,
+        Команда Aerialsolutions.kz
+
+        Контакты:
+        Email: support@aerialsolutions.kz
+        Сайт: https://aerialsolutions.kz
+
+        Это автоматическое письмо, не отвечайте на него.
+        Если у вас возникли вопросы, напишите на support@aerialsolutions.kz
+            """
+
+        email_log = EmailLog.objects.create(
+            user=user,
+            recipient=user.email,
+            email_type='password_reset',
+            subject='Сброс пароля',
+            status='pending'
+        )
+
+        try:
+            sendpulse = SendPulseService()
+            result = sendpulse.send_email(
+                to_email=user.email,
+                subject='Сброс пароля на aerialsolutions.kz',
+                html_content=text_content
+            )
+
             if result['success']:
                 email_log.status = 'sent'
                 email_log.sent_at = timezone.now()
@@ -76,37 +137,3 @@ class EmailService:
 
         email_log.save()
         return email_log
-
-    @classmethod
-    def send_verification_email(cls, user, token: str) -> EmailLog:
-        """Отправить письмо для подтверждения email"""
-        verification_link = f"{settings.FRONTEND_URL}/set-password?token={token}"
-
-        return cls._send_email(
-            recipient=user.email,
-            subject='Подтверждение регистрации на Aerialsolutions.kz',
-            template_name='emails/verification.html',
-            context={
-                'user': user,
-                'verification_link': verification_link,
-            },
-            email_type='email_verification',
-            user=user
-        )
-
-    @classmethod
-    def send_password_reset_email(cls, user, token: str) -> EmailLog:
-        """Отправить письмо для сброса пароля"""
-        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-
-        return cls._send_email(
-            recipient=user.email,
-            subject='Сброс пароля на Aerialsolutions.kz',
-            template_name='emails/password_reset.html',
-            context={
-                'user': user,
-                'reset_link': reset_link,
-            },
-            email_type='password_reset',
-            user=user
-        )
