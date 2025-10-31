@@ -2,10 +2,10 @@ import requests
 import time
 from typing import Optional, Dict, Any
 from django.conf import settings
-import logging  # ← ДОБАВЬТЕ
+import logging
 from django.core.cache import cache
 
-logger = logging.getLogger(__name__)  # ← ДОБАВЬТЕ
+logger = logging.getLogger(__name__)
 
 
 class SendPulseService:
