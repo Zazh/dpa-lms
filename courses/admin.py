@@ -41,15 +41,15 @@ class CourseEnrollmentInline(admin.TabularInline):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ('title', 'get_lessons_count', 'get_students_count', 'is_active', 'created_at')
-    list_filter = ('is_active', 'created_at')
-    search_fields = ('title', 'description')
+    list_display = ('title', 'get_lessons_count', 'get_students_count', 'is_active', )
+    list_filter = ('is_active', 'created_at', 'label')
+    search_fields = ('title', 'description', 'label')
     readonly_fields = ('created_at', 'updated_at')
     inlines = [LessonInline, CourseEnrollmentInline]
 
     fieldsets = (
         ('Основная информация', {
-            'fields': ('title', 'description', 'created_by', 'is_active')
+            'fields': ('title', 'label', 'duration', 'description', 'created_by', 'is_active')
         }),
         ('Даты', {
             'fields': ('created_at', 'updated_at'),

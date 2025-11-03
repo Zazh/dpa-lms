@@ -138,7 +138,7 @@ class CourseDetailSerializer(serializers.ModelSerializer):
         model = Course
         fields = [
             'id', 'title', 'description', 'total_lessons',
-            'progress_percentage', 'enrolled_at', 'lessons'
+            'progress_percentage', 'enrolled_at', 'lessons', 'label', 'duration'
         ]
 
     def get_progress_percentage(self, obj):
@@ -175,7 +175,7 @@ class CourseListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'description', 'total_lessons', 'progress_percentage']
+        fields = ['id', 'title', 'description', 'total_lessons', 'progress_percentage', 'label', 'duration', ]
 
     def get_progress_percentage(self, obj):
         """Прогресс пользователя по курсу"""

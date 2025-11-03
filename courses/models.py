@@ -8,6 +8,14 @@ class Course(models.Model):
     """Модель курса"""
 
     title = models.CharField('Название курса', max_length=255)
+    label = models.CharField('Label', max_length=50, blank=True,)
+    duration = models.DecimalField(
+        verbose_name='Длительность (часы)',
+        max_digits=5,
+        decimal_places=2,
+        blank=True,
+        null=True,
+    )
     description = models.TextField('Описание курса', blank=True)
 
     created_by = models.ForeignKey(

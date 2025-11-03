@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    AllCourseListView,
     MyCourseListView,
     CourseDetailView,
     LessonDetailView,
@@ -10,6 +11,9 @@ from .views import (
 app_name = 'courses'
 
 urlpatterns = [
+    # Все курсы
+    path('', AllCourseListView.as_view(), name='all-courses'),
+
     # Список моих курсов
     path('my-courses/', MyCourseListView.as_view(), name='my-courses'),
 

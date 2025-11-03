@@ -209,3 +209,20 @@ class MyProgressView(APIView):
             })
 
         return Response(progress_data)
+
+
+class AllCourseListView(APIView):
+    """Список всех активных курсов"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Получаем все активные курсы
+        courses = Course.objects.filter(is_active=True)
+
+        serializer = CourseListSerializer(
+            courses,
+            many=True,
+            context={'request': request}
+        )
+
+        return Response(serializer.data)
