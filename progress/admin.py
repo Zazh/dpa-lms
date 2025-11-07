@@ -229,80 +229,44 @@ class LessonProgressAdmin(admin.ModelAdmin):
 
 @admin.register(VideoProgress)
 class VideoProgressAdmin(admin.ModelAdmin):
-    list_display = ['user_info', 'video_lesson_info', 'progress_bar', 'watch_count', 'total_watch_time_display',
-                    'completion_badge', 'last_watched_at']
-    list_filter = ['is_completed', 'video_lesson__lesson__module__course', 'last_watched_at']
+    list_display = ['user_info', 'video_lesson_title', 'watch_percentage_display', 'is_completed_badge', 'started_at',
+                    'last_watched_at']
+    list_filter = ['started_at', 'last_watched_at']
     search_fields = ['user__email', 'user__first_name', 'user__last_name', 'video_lesson__lesson__title']
-    readonly_fields = ['current_position', 'watch_percentage', 'total_watch_time', 'watch_count', 'last_watched_at',
-                       'remaining_time_display', 'formatted_watch_time']
-    date_hierarchy = 'last_watched_at'
+    readonly_fields = ['started_at', 'last_watched_at']
 
     fieldsets = (
         ('Основная информация', {
-            'fields': ('user', 'video_lesson', 'is_completed')
+            'fields': ('user', 'video_lesson', 'watch_percentage')
         }),
-        ('Прогресс просмотра', {
-            'fields': ('current_position', 'watch_percentage', 'remaining_time_display')
-        }),
-        ('Статистика', {
-            'fields': ('watch_count', 'total_watch_time', 'formatted_watch_time', 'last_watched_at')
+        ('Даты', {
+            'fields': ('started_at', 'last_watched_at')
         }),
     )
 
     def user_info(self, obj):
-        return f"{obj.user.get_full_name()}"
+        return f"{obj.user.get_full_name()} ({obj.user.email})"
 
-    user_info.short_description = 'Студент'
+    user_info.short_description = 'Пользователь'
 
-    def video_lesson_info(self, obj):
+    def video_lesson_title(self, obj):
         return obj.video_lesson.lesson.title
 
-    video_lesson_info.short_description = 'Видео'
+    video_lesson_title.short_description = 'Видео-урок'
 
-    def progress_bar(self, obj):
+    def watch_percentage_display(self, obj):
         percentage = float(obj.watch_percentage)
-        threshold = obj.video_lesson.completion_threshold
-        color = '#28a745' if percentage >= threshold else '#ffc107' if percentage >= 50 else '#dc3545'
+        color = '#28a745' if percentage >= 90 else '#ffc107' if percentage >= 50 else '#dc3545'
         return format_html(
-            '<div style="width: 100px; background-color: #e9ecef; border-radius: 4px; overflow: hidden;">'
-            '<div style="width: {}%; background-color: {}; color: white; text-align: center; padding: 2px 0; font-size: 11px;">'
-            '{}%'
-            '</div>'
-            '</div>',
-            min(percentage, 100), color, int(percentage)
+            '<span style="color: {}; font-weight: bold;">{}%</span>',
+            color, int(percentage)
         )
 
-    progress_bar.short_description = 'Прогресс'
+    watch_percentage_display.short_description = 'Просмотр'
 
-    def completion_badge(self, obj):
-        if obj.is_completed:
-            return format_html(
-                '<span style="background-color: #28a745; color: white; padding: 3px 10px; border-radius: 3px;">✅ Завершен</span>')
-        return format_html(
-            '<span style="background-color: #ffc107; color: white; padding: 3px 10px; border-radius: 3px;">⏳ Просмотр</span>')
+    def is_completed_badge(self, obj):
+        if obj.is_mostly_watched():
+            return '✅ Завершено'
+        return '⏳ В процессе'
 
-    completion_badge.short_description = 'Статус'
-
-    def total_watch_time_display(self, obj):
-        return obj.format_watch_time()
-
-    total_watch_time_display.short_description = 'Время просмотра'
-
-    def remaining_time_display(self, obj):
-        remaining = obj.get_remaining_time()
-        minutes = remaining // 60
-        seconds = remaining % 60
-        return f'{minutes}:{seconds:02d}'
-
-    remaining_time_display.short_description = 'Осталось'
-
-    def formatted_watch_time(self, obj):
-        return obj.format_watch_time()
-
-    formatted_watch_time.short_description = 'Общее время (ММ:СС)'
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return request.user.is_superuser
+    is_completed_badge.short_description = 'Статус'

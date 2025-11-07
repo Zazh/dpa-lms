@@ -355,42 +355,36 @@ class VideoProgress(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='video_progress',
-        verbose_name='Студент'
+        verbose_name='Пользователь'
     )
 
     video_lesson = models.ForeignKey(
-        VideoLesson,
+        'content.VideoLesson',
         on_delete=models.CASCADE,
         related_name='progress_records',
         verbose_name='Видео-урок'
     )
 
-    current_position = models.PositiveIntegerField(
-        'Текущая позиция (секунды)',
-        default=0
-    )
-
+    # ТОЛЬКО процент просмотра, БЕЗ позиции
     watch_percentage = models.DecimalField(
         'Процент просмотра',
         max_digits=5,
         decimal_places=2,
-        default=0
-    )
-
-    total_watch_time = models.PositiveIntegerField(
-        'Общее время просмотра (секунды)',
         default=0,
-        help_text='Суммарное время всех просмотров'
+        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        help_text='Максимальный процент просмотра видео'
     )
 
-    watch_count = models.PositiveIntegerField(
-        'Количество просмотров',
-        default=0
+    started_at = models.DateTimeField(
+        'Начало просмотра',
+        null=True,
+        blank=True
     )
 
-    is_completed = models.BooleanField('Завершен', default=False, db_index=True)
-
-    last_watched_at = models.DateTimeField('Последний просмотр', auto_now=True)
+    last_watched_at = models.DateTimeField(
+        'Последний просмотр',
+        auto_now=True
+    )
 
     class Meta:
         verbose_name = 'Прогресс видео'
@@ -398,50 +392,22 @@ class VideoProgress(models.Model):
         unique_together = [['user', 'video_lesson']]
         indexes = [
             models.Index(fields=['user', 'video_lesson']),
-            models.Index(fields=['user', 'is_completed']),
         ]
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.video_lesson.lesson.title} ({self.watch_percentage}%)"
 
-    def update_progress(self, current_position, session_watch_time=0):
-        """Обновить прогресс просмотра"""
-        self.current_position = current_position
-        self.total_watch_time += session_watch_time
-        self.watch_count += 1
+    def update_progress(self, percentage):
+        """Обновить процент просмотра (только увеличивать)"""
+        if percentage > self.watch_percentage:
+            self.watch_percentage = min(percentage, 100)
 
-        # Рассчитываем процент просмотра
-        if self.video_lesson.video_duration > 0:
-            self.watch_percentage = round(
-                (current_position / self.video_lesson.video_duration) * 100, 2
-            )
+            if not self.started_at:
+                self.started_at = timezone.now()
 
-        # Проверяем завершение
-        if self.watch_percentage >= self.video_lesson.completion_threshold and not self.is_completed:
-            self.is_completed = True
+            self.save()
 
-            # Обновляем прогресс урока
-            LessonProgress.objects.update_or_create(
-                user=self.user,
-                lesson=self.video_lesson.lesson,
-                defaults={
-                    'is_completed': True,
-                    'completed_at': timezone.now(),
-                    'completion_data': {
-                        'watch_percentage': float(self.watch_percentage),
-                        'total_watch_time': self.total_watch_time
-                    }
-                }
-            )
-
-        self.save()
-
-    def get_remaining_time(self):
-        """Оставшееся время просмотра в секундах"""
-        return max(0, self.video_lesson.video_duration - self.current_position)
-
-    def format_watch_time(self):
-        """Форматированное время просмотра"""
-        minutes = self.total_watch_time // 60
-        seconds = self.total_watch_time % 60
-        return f"{minutes}:{seconds:02d}"
+    def is_mostly_watched(self):
+        """Проверка достижения порога завершения"""
+        threshold = self.video_lesson.completion_threshold
+        return self.watch_percentage >= threshold
