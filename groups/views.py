@@ -80,7 +80,6 @@ class JoinGroupByTokenView(APIView):
 
             # Обновляем зачисление
             existing_enrollment.group = group
-            existing_enrollment.payment_status = 'unpaid' if group.is_paid else 'paid'
             existing_enrollment.save()
 
             return Response({
@@ -111,7 +110,6 @@ class JoinGroupByTokenView(APIView):
             user=request.user,
             course=group.course,
             group=group,
-            payment_status='unpaid' if group.is_paid else 'paid',
             is_active=True
         )
 

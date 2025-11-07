@@ -174,13 +174,16 @@ class Group(models.Model):
             membership.left_at = timezone.now()
             membership.save()
 
-            # Деактивируем зачисление
+            # Синхронизируем статус зачисления
             from progress.models import CourseEnrollment
-            CourseEnrollment.objects.filter(
-                user=user,
-                course=self.course,
-                group=self
-            ).update(is_active=False)
+            try:
+                enrollment = CourseEnrollment.objects.get(
+                    user=user,
+                    course=self.course
+                )
+                enrollment.sync_active_status()
+            except CourseEnrollment.DoesNotExist:
+                pass
 
         return True, 'Студент удален'
 
@@ -227,12 +230,15 @@ class Group(models.Model):
             membership.left_at = now
             membership.save()
 
-            # Деактивируем зачисление
-            CourseEnrollment.objects.filter(
-                user=membership.user,
-                course=membership.group.course,
-                group=membership.group
-            ).update(is_active=False)
+            # Синхронизируем зачисление
+            try:
+                enrollment = CourseEnrollment.objects.get(
+                    user=membership.user,
+                    course=membership.group.course
+                )
+                enrollment.sync_active_status()
+            except CourseEnrollment.DoesNotExist:
+                pass
 
             deactivated_count += 1
 

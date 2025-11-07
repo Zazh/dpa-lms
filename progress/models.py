@@ -1,3 +1,4 @@
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -8,12 +9,6 @@ from groups.models import Group
 
 class CourseEnrollment(models.Model):
     """Зачисление студента на курс"""
-
-    PAYMENT_STATUS_CHOICES = [
-        ('unpaid', '❌ Не оплачено'),
-        ('paid', '✅ Оплачено'),
-        ('trial', '🎁 Пробный доступ'),
-    ]
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -38,22 +33,14 @@ class CourseEnrollment(models.Model):
         verbose_name='Группа'
     )
 
-    payment_status = models.CharField(
-        'Статус оплаты',
-        max_length=20,
-        choices=PAYMENT_STATUS_CHOICES,
-        default='unpaid',
-        db_index=True
-    )
-
     enrolled_at = models.DateTimeField('Дата зачисления', auto_now_add=True, db_index=True)
 
     progress_percentage = models.DecimalField(
-        'Прогресс (%)',
+        'Процент прохождения',
         max_digits=5,
         decimal_places=2,
         default=0,
-        db_index=True
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
 
     completed_lessons_count = models.PositiveIntegerField(
@@ -65,7 +52,8 @@ class CourseEnrollment(models.Model):
         'Последняя активность',
         null=True,
         blank=True,
-        db_index=True
+        db_index=True,
+        help_text='False = удален из группы или дедлайн истек'
     )
 
     is_active = models.BooleanField('Активно', default=True, db_index=True)
@@ -81,8 +69,37 @@ class CourseEnrollment(models.Model):
             models.Index(fields=['-enrolled_at']),
         ]
 
+    def has_access(self):
+        """
+        Проверка доступа к курсу.
+        Доступ есть ТОЛЬКО если есть активное членство в группе.
+        """
+        if not self.group:
+            return False
+
+        from groups.models import GroupMembership
+        return GroupMembership.objects.filter(
+            user=self.user,
+            group=self.group,
+            is_active=True
+        ).exists()
+
+    def sync_active_status(self):
+        """
+        Синхронизировать is_active с состоянием GroupMembership.
+        Вызывается автоматически при изменении GroupMembership.
+        """
+        has_access = self.has_access()
+
+        if self.is_active != has_access:
+            self.is_active = has_access
+            self.save(update_fields=['is_active'])
+
     def __str__(self):
-        return f"{self.user.get_full_name()} → {self.course.title}"
+        status = '✅' if self.has_access() else '❌'
+        group_name = self.group.name if self.group else "без группы"
+        return f"{status} {self.user.get_full_name()} → {self.course.title} ({group_name})"
+
 
     def calculate_progress(self):
         """Рассчитать прогресс по курсу"""

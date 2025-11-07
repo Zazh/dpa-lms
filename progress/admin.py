@@ -6,17 +6,20 @@ from .models import CourseEnrollment, LessonProgress, VideoProgress
 
 @admin.register(CourseEnrollment)
 class CourseEnrollmentAdmin(admin.ModelAdmin):
-    list_display = ['user_info', 'course', 'group', 'payment_badge', 'progress_bar', 'completed_lessons_info',
-                    'enrolled_at', 'last_activity_at', 'status_badge']
-    list_filter = ['is_active', 'payment_status', 'course', 'group', 'enrolled_at']
+    list_display = ['user_info', 'course', 'group', 'access_badge', 'progress_bar', 'completed_lessons_info',
+                    'enrolled_at', 'last_activity_at']
+    list_filter = ['is_active', 'course', 'group', 'enrolled_at']
     search_fields = ['user__email', 'user__first_name', 'user__last_name', 'course__title']
     readonly_fields = ['enrolled_at', 'progress_percentage', 'completed_lessons_count', 'last_activity_at',
-                       'current_lesson_display', 'completed_modules_display']
+                       'current_lesson_display', 'completed_modules_display', 'access_status_display']
     date_hierarchy = 'enrolled_at'
 
     fieldsets = (
         ('Основная информация', {
-            'fields': ('user', 'course', 'group', 'payment_status', 'is_active')
+            'fields': ('user', 'course', 'group', 'is_active')
+        }),
+        ('Доступ', {
+            'fields': ('access_status_display',)
         }),
         ('Прогресс', {
             'fields': ('progress_percentage', 'completed_lessons_count', 'current_lesson_display',
@@ -27,26 +30,51 @@ class CourseEnrollmentAdmin(admin.ModelAdmin):
         }),
     )
 
-    actions = ['recalculate_progress', 'activate_enrollments', 'deactivate_enrollments', 'mark_as_paid']
+    actions = ['recalculate_progress', 'sync_access_status']
 
     def user_info(self, obj):
         return f"{obj.user.get_full_name()} ({obj.user.email})"
 
     user_info.short_description = 'Студент'
 
-    def payment_badge(self, obj):
-        colors = {
-            'unpaid': '#dc3545',
-            'paid': '#28a745',
-            'trial': '#17a2b8',
-        }
+    def access_badge(self, obj):
+        """Бейдж доступа на основе GroupMembership"""
+        if obj.has_access():
+            return format_html(
+                '<span style="background-color: #28a745; color: white; padding: 3px 10px; border-radius: 3px;">✅ Доступ есть</span>'
+            )
         return format_html(
-            '<span style="background-color: {}; color: white; padding: 3px 10px; border-radius: 3px;">{}</span>',
-            colors.get(obj.payment_status, '#6c757d'),
-            obj.get_payment_status_display()
+            '<span style="background-color: #dc3545; color: white; padding: 3px 10px; border-radius: 3px;">❌ Доступа нет</span>'
         )
 
-    payment_badge.short_description = 'Оплата'
+    access_badge.short_description = 'Доступ'
+
+    def access_status_display(self, obj):
+        """Детальный статус доступа"""
+        if not obj.group:
+            return '❌ Не привязан к группе'
+
+        from groups.models import GroupMembership
+        membership = GroupMembership.objects.filter(
+            user=obj.user,
+            group=obj.group,
+            is_active=True
+        ).first()
+
+        if not membership:
+            return f'❌ Нет активного членства в группе "{obj.group.name}"'
+
+        deadline_info = ''
+        if membership.personal_deadline_at:
+            days_left = membership.get_days_until_deadline()
+            if days_left == 0:
+                deadline_info = ' (дедлайн истёк)'
+            elif days_left and days_left <= 7:
+                deadline_info = f' (осталось {days_left} дн.)'
+
+        return f'✅ Активное членство в группе "{obj.group.name}"{deadline_info}'
+
+    access_status_display.short_description = 'Статус доступа'
 
     def progress_bar(self, obj):
         percentage = float(obj.progress_percentage)
@@ -68,15 +96,6 @@ class CourseEnrollmentAdmin(admin.ModelAdmin):
         return f'📚 {obj.completed_lessons_count}/{total}'
 
     completed_lessons_info.short_description = 'Уроки'
-
-    def status_badge(self, obj):
-        if obj.is_active:
-            return format_html(
-                '<span style="background-color: #28a745; color: white; padding: 3px 10px; border-radius: 3px;">✅ Активно</span>')
-        return format_html(
-            '<span style="background-color: #6c757d; color: white; padding: 3px 10px; border-radius: 3px;">❌ Неактивно</span>')
-
-    status_badge.short_description = 'Статус'
 
     def current_lesson_display(self, obj):
         lesson = obj.get_current_lesson()
@@ -103,23 +122,15 @@ class CourseEnrollmentAdmin(admin.ModelAdmin):
 
     recalculate_progress.short_description = '🔄 Пересчитать прогресс'
 
-    def activate_enrollments(self, request, queryset):
-        updated = queryset.update(is_active=True)
-        self.message_user(request, f'✅ Активировано: {updated}')
+    def sync_access_status(self, request, queryset):
+        """Синхронизировать статус доступа с GroupMembership"""
+        count = 0
+        for enrollment in queryset:
+            enrollment.sync_active_status()
+            count += 1
+        self.message_user(request, f'🔄 Синхронизировано: {count}')
 
-    activate_enrollments.short_description = '✅ Активировать зачисления'
-
-    def deactivate_enrollments(self, request, queryset):
-        updated = queryset.update(is_active=False)
-        self.message_user(request, f'❌ Деактивировано: {updated}')
-
-    deactivate_enrollments.short_description = '❌ Деактивировать зачисления'
-
-    def mark_as_paid(self, request, queryset):
-        updated = queryset.update(payment_status='paid')
-        self.message_user(request, f'💰 Отмечено как оплачено: {updated}')
-
-    mark_as_paid.short_description = '💰 Отметить как оплачено'
+    sync_access_status.short_description = '🔄 Синхронизировать доступ'
 
 @admin.register(LessonProgress)
 class LessonProgressAdmin(admin.ModelAdmin):
