@@ -18,10 +18,11 @@ class CheckEmailSerializer(serializers.Serializer):
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """Сериализатор для регистрации пользователя (Шаг 2)"""
     email = serializers.EmailField(read_only=True)
+    referral_token = serializers.UUIDField(required=False, write_only=True)
 
     class Meta:
         model = User
-        fields = ['email', 'first_name', 'last_name', 'middle_name', 'iin', 'phone']
+        fields = ['email', 'first_name', 'last_name', 'middle_name', 'iin', 'phone', 'referral_token']
 
     def validate_iin(self, value):
         """Валидация ИИН"""

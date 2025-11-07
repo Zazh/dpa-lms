@@ -70,6 +70,9 @@ class RegisterView(APIView):
         serializer = UserRegistrationSerializer(data=data)
         serializer.is_valid(raise_exception=True)
 
+        # Получаем referral_token если есть
+        referral_token = serializer.validated_data.pop('referral_token', None)  # ← ДОБАВИТЬ
+
         # Создаем пользователя без пароля
         user = User.objects.create(
             email=email,
@@ -85,12 +88,20 @@ class RegisterView(APIView):
         # Создаем токен для подтверждения email
         token = EmailVerificationToken.objects.create(user=user)
 
+        # Сохраняем referral_token в токене для использования после установки пароля
+        if referral_token:  # ← ДОБАВИТЬ
+            # Сохраняем в completion_data (временно, можно использовать это поле)
+            # Или создайте отдельное поле в EmailVerificationToken
+            # Для простоты сохраним в сессии через frontend
+            pass
+
         # Отправляем email с ссылкой
         EmailService.send_verification_email(user=user, token=token.token)
 
         return Response({
             'message': 'Регистрация успешна. Проверьте email для установки пароля.',
-            'email': user.email
+            'email': user.email,
+            'referral_token': str(referral_token) if referral_token else None  # ← ДОБАВИТЬ (отправляем обратно)
         }, status=status.HTTP_201_CREATED)
 
 
@@ -104,6 +115,7 @@ class SetPasswordView(APIView):
 
         token_uuid = serializer.validated_data['token']
         password = serializer.validated_data['password']
+        referral_token = request.data.get('referral_token')  # ← ДОБАВИТЬ (получаем из фронтенда)
 
         try:
             token = EmailVerificationToken.objects.get(token=token_uuid)
@@ -130,10 +142,58 @@ class SetPasswordView(APIView):
         token.is_used = True
         token.save()
 
-        return Response({
+        # АВТОМАТИЧЕСКОЕ ЗАЧИСЛЕНИЕ ПО РЕФЕРАЛЬНОЙ ССЫЛКЕ
+        enrollment_info = None
+        if referral_token:  # ← ДОБАВИТЬ
+            try:
+                from groups.models import Group
+                from progress.models import CourseEnrollment, LessonProgress
+                from content.models import Lesson
+
+                group = Group.objects.get(referral_token=referral_token, is_active=True)
+
+                # Проверяем, что группа не заполнена
+                if not group.is_full():
+                    # Добавляем в группу
+                    success, message = group.add_student(user, enrolled_via_referral=True)
+
+                    if success:
+                        # Создаем зачисление
+                        enrollment = CourseEnrollment.objects.create(
+                            user=user,
+                            course=group.course,
+                            group=group,
+                            payment_status='unpaid' if group.is_paid else 'paid',
+                            is_active=True
+                        )
+
+                        # Инициализируем прогресс
+                        lessons = Lesson.objects.filter(module__course=group.course).order_by('module__order', 'order')
+                        for lesson in lessons:
+                            progress = LessonProgress.objects.create(
+                                user=user,
+                                lesson=lesson,
+                                is_completed=False
+                            )
+                            progress.calculate_available_at()
+
+                        enrollment_info = {
+                            'course': group.course.title,
+                            'group': group.name,
+                        }
+            except Group.DoesNotExist:
+                pass  # Токен невалидный - игнорируем
+
+        response_data = {
             'message': 'Пароль успешно установлен. Теперь вы можете войти в систему.',
             'email': user.email
-        })
+        }
+
+        if enrollment_info:  # ← ДОБАВИТЬ
+            response_data['enrollment'] = enrollment_info
+            response_data['message'] = f'Пароль установлен! Вы зачислены на курс "{enrollment_info["course"]}"'
+
+        return Response(response_data)
 
 
 class LoginView(APIView):

@@ -13,7 +13,9 @@ urlpatterns = [
 
     # API endpoints
     path('api/account/', include('account.urls')),
-    path('api/courses/', include('courses.urls')),
+    # path('api/courses/', include('courses.urls')),
+    path('api/groups/', include('groups.urls')),
+
 ]
 
 # Для разработки - отдача медиа и статических файлов
