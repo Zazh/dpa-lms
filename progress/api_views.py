@@ -76,7 +76,6 @@ class LessonCompleteView(APIView):
     def post(self, request, pk):
         lesson = get_object_or_404(Lesson, pk=pk)
 
-        # Проверка зачисления
         try:
             enrollment = CourseEnrollment.objects.get(
                 user=request.user,
@@ -88,14 +87,14 @@ class LessonCompleteView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Проверка доступа
+            # Проверка доступа
         if not enrollment.has_access():
             return Response(
                 {'error': 'Доступ к курсу закрыт'},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Получаем прогресс урока
+            # Получаем прогресс урока
         try:
             lesson_progress = LessonProgress.objects.get(
                 user=request.user,
@@ -107,14 +106,14 @@ class LessonCompleteView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Проверка доступности урока
+            # Проверка доступности урока
         if not lesson_progress.is_available():
             return Response(
                 {'error': 'Урок недоступен'},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        # Для видео: проверяем процент просмотра
+            # Для видео: проверяем процент просмотра
         if lesson.lesson_type == 'video':
             try:
                 video_progress = VideoProgress.objects.get(
@@ -136,9 +135,13 @@ class LessonCompleteView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        # Завершаем урок (если еще не завершен)
+            # Завершаем урок (если еще не завершен)
         if not lesson_progress.is_completed:
             lesson_progress.mark_completed()
+            # mark_completed() уже пересчитывает прогресс курса
+
+            # Обновляем enrollment из БД (т.к. mark_completed изменил его)
+        enrollment.refresh_from_db()
 
         # Получаем следующий урок
         next_lesson = self._get_next_lesson(lesson)
@@ -163,10 +166,21 @@ class LessonCompleteView(APIView):
                 'available_in': self._get_available_in(next_progress.available_at)
             }
 
+        # Подсчитываем общее количество уроков
+        total_lessons = Lesson.objects.filter(module__course=enrollment.course).count()
+
         return Response({
             'success': True,
             'message': 'Урок завершен!',
-            'course_progress': float(enrollment.progress_percentage),
+
+            # РАСШИРЕННЫЙ ОТВЕТ: Прогресс курса
+            'course_progress': {
+                'percentage': float(enrollment.progress_percentage),
+                'completed_lessons': enrollment.completed_lessons_count,
+                'total_lessons': total_lessons
+            },
+
+            # Следующий урок
             'next_lesson': next_lesson_data
         })
 

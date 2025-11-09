@@ -30,7 +30,7 @@ class CourseEnrollmentAdmin(admin.ModelAdmin):
         }),
     )
 
-    actions = ['recalculate_progress', 'sync_access_status']
+    actions = ['sync_access_status']
 
     def user_info(self, obj):
         return f"{obj.user.get_full_name()} ({obj.user.email})"
@@ -112,15 +112,6 @@ class CourseEnrollmentAdmin(admin.ModelAdmin):
         return f'📦 {completed}/{total} модулей'
 
     completed_modules_display.short_description = 'Модули'
-
-    def recalculate_progress(self, request, queryset):
-        count = 0
-        for enrollment in queryset:
-            enrollment.calculate_progress()
-            count += 1
-        self.message_user(request, f'🔄 Пересчитан прогресс для {count} зачислений')
-
-    recalculate_progress.short_description = '🔄 Пересчитать прогресс'
 
     def sync_access_status(self, request, queryset):
         """Синхронизировать статус доступа с GroupMembership"""
@@ -208,14 +199,26 @@ class LessonProgressAdmin(admin.ModelAdmin):
             progress.mark_completed()
             count += 1
         self.message_user(request, f'✅ Отмечено завершенными: {count}')
-
-    mark_completed.short_description = '✅ Отметить завершенными'
+    mark_completed.short_description = '🔧 [Служебное] Вручную завершить урок'
 
     def mark_uncompleted(self, request, queryset):
         updated = queryset.update(is_completed=False, completed_at=None)
+
+        # ВАЖНО: Пересчитать прогресс курса после отмены
+        for progress in queryset:
+            try:
+                from content.models import Lesson
+                enrollment = CourseEnrollment.objects.get(
+                    user=progress.user,
+                    course=progress.lesson.module.course
+                )
+                enrollment.calculate_progress()
+            except CourseEnrollment.DoesNotExist:
+                pass
+
         self.message_user(request, f'⏳ Отмечено незавершенными: {updated}')
 
-    mark_uncompleted.short_description = '⏳ Отметить незавершенными'
+    mark_uncompleted.short_description = '🔧 [Служебное] Отменить завершение'
 
     def recalculate_availability(self, request, queryset):
         count = 0
@@ -223,8 +226,7 @@ class LessonProgressAdmin(admin.ModelAdmin):
             progress.calculate_available_at()
             count += 1
         self.message_user(request, f'🔄 Пересчитана доступность для {count} записей')
-
-    recalculate_availability.short_description = '🔄 Пересчитать доступность'
+    recalculate_availability.short_description = '🔧 [Служебное] Пересчитать доступность'
 
 
 @admin.register(VideoProgress)

@@ -332,6 +332,8 @@ class LessonProgress(models.Model):
         return None
 
     def calculate_available_at(self):
+        """Рассчитать когда урок станет доступен"""
+
         # 1. Если не требует завершения предыдущего
         if not self.lesson.requires_previous_completion:
             self.available_at = timezone.now()
@@ -359,7 +361,14 @@ class LessonProgress(models.Model):
                 self.save()
                 return
 
-            # 4. Предыдущий завершен - добавляем задержку
+            # 4. ВАЖНО: Проверяем что completed_at не None
+            if not previous_progress.completed_at:
+                # Урок завершен, но нет даты завершения (старые данные)
+                # Используем текущее время
+                previous_progress.completed_at = timezone.now()
+                previous_progress.save()
+
+            # 5. Предыдущий завершен - добавляем задержку
             delay = timedelta(hours=self.lesson.access_delay_hours)
             self.available_at = previous_progress.completed_at + delay
             self.save()
