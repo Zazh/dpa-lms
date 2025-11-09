@@ -15,6 +15,8 @@ urlpatterns = [
     path('api/account/', include('account.urls')),
     # path('api/courses/', include('courses.urls')),
     path('api/groups/', include('groups.urls')),
+    path('api/', include('content.urls')),
+    path('api/', include('progress.urls')),
 
 ]
 

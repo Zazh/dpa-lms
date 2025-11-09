@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.conf import settings
@@ -278,6 +280,16 @@ class LessonProgress(models.Model):
                 enrollment.calculate_progress()
                 enrollment.update_last_activity()
 
+                # НОВОЕ: Пересчитать available_at для следующего урока
+                next_lesson = self._get_next_lesson()
+                if next_lesson:
+                    next_progress, created = LessonProgress.objects.get_or_create(
+                        user=self.user,
+                        lesson=next_lesson,
+                        defaults={'is_completed': False}
+                    )
+                    next_progress.calculate_available_at()  # ← КЛЮЧЕВОЙ МОМЕНТ!
+
                 # Если достигнут 100% прогресс - создать выпускника
                 if enrollment.progress_percentage >= 100:
                     from graduates.models import Graduate
@@ -295,41 +307,65 @@ class LessonProgress(models.Model):
             except CourseEnrollment.DoesNotExist:
                 pass
 
+    def _get_next_lesson(self):
+        """Получить следующий урок в курсе"""
+        from content.models import Lesson, Module
+
+        # Пытаемся найти следующий урок в том же модуле
+        next_in_module = Lesson.objects.filter(
+            module=self.lesson.module,
+            order__gt=self.lesson.order
+        ).order_by('order').first()
+
+        if next_in_module:
+            return next_in_module
+
+        # Если нет - ищем в следующем модуле
+        next_module = Module.objects.filter(
+            course=self.lesson.module.course,
+            order__gt=self.lesson.module.order
+        ).order_by('order').first()
+
+        if next_module:
+            return Lesson.objects.filter(module=next_module).order_by('order').first()
+
+        return None
+
     def calculate_available_at(self):
-        """Рассчитать время доступности урока"""
-        # Если урок не требует завершения предыдущего
+        # 1. Если не требует завершения предыдущего
         if not self.lesson.requires_previous_completion:
             self.available_at = timezone.now()
             self.save()
             return
 
-        # Получаем предыдущий урок
+        # 2. Получаем предыдущий урок
         previous_lesson = self.lesson.get_previous_lesson()
         if not previous_lesson:
-            # Первый урок модуля - доступен сразу
+            # Первый урок - доступен сразу
             self.available_at = timezone.now()
             self.save()
             return
 
-        # Проверяем прогресс предыдущего урока
+        # 3. Проверяем прогресс предыдущего урока
         try:
             previous_progress = LessonProgress.objects.get(
                 user=self.user,
                 lesson=previous_lesson
             )
 
-            if previous_progress.is_completed and previous_progress.completed_at:
-                # Добавляем задержку если нужно
-                if self.lesson.access_delay_hours > 0:
-                    self.available_at = previous_progress.completed_at + timezone.timedelta(
-                        hours=self.lesson.access_delay_hours
-                    )
-                else:
-                    self.available_at = previous_progress.completed_at
+            if not previous_progress.is_completed:
+                # Предыдущий не завершен - недоступен
+                self.available_at = None
                 self.save()
+                return
+
+            # 4. Предыдущий завершен - добавляем задержку
+            delay = timedelta(hours=self.lesson.access_delay_hours)
+            self.available_at = previous_progress.completed_at + delay
+            self.save()
 
         except LessonProgress.DoesNotExist:
-            # Предыдущий урок не начат - текущий недоступен
+            # Если нет прогресса предыдущего - недоступен
             self.available_at = None
             self.save()
 
