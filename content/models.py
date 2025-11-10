@@ -72,7 +72,7 @@ class Module(models.Model):
     requires_previous_module = models.BooleanField(
         'Требует завершения предыдущего модуля',
         default=True,
-        help_text='Студент должен завершить предыдущий модуль'
+        help_text='⚠️ НЕ ИСПОЛЬЗУЕТСЯ. Логика доступности работает на уровне уроков.'
     )
 
     created_at = models.DateTimeField('Создан', auto_now_add=True)
@@ -208,11 +208,59 @@ class Lesson(models.Model):
         #     return False
 
     def get_previous_lesson(self):
-        """Получить предыдущий урок"""
-        return Lesson.objects.filter(
+        """Получить предыдущий урок в курсе (учитывает модули)"""
+
+        # 1. Ищем в том же модуле
+        previous_in_module = Lesson.objects.filter(
             module=self.module,
             order__lt=self.order
         ).order_by('-order').first()
+
+        if previous_in_module:
+            return previous_in_module
+
+        # 2. Ищем предыдущий модуль
+        previous_module = Module.objects.filter(
+            course=self.module.course,
+            order__lt=self.module.order
+        ).order_by('-order').first()
+
+        if not previous_module:
+            # Это первый урок курса
+            return None
+
+        # 3. Возвращаем последний урок предыдущего модуля
+        return Lesson.objects.filter(
+            module=previous_module
+        ).order_by('-order').first()
+
+
+    def get_next_lesson(self):
+        """Получить следующий урок в курсе (учитывает модули)"""
+
+        # 1. Ищем в том же модуле
+        next_in_module = Lesson.objects.filter(
+            module=self.module,
+            order__gt=self.order
+        ).order_by('order').first()
+
+        if next_in_module:
+            return next_in_module
+
+        # 2. Ищем следующий модуль
+        next_module = Module.objects.filter(
+            course=self.module.course,
+            order__gt=self.module.order
+        ).order_by('order').first()
+
+        if not next_module:
+            # Это последний урок курса
+            return None
+
+        # 3. Возвращаем первый урок следующего модуля
+        return Lesson.objects.filter(
+            module=next_module
+        ).order_by('order').first()
 
     def get_materials_count(self):
         """Количество материалов к уроку"""

@@ -379,9 +379,18 @@ class LessonProgress(models.Model):
             self.save()
 
     def is_available(self):
-        """Проверка доступности урока"""
+        """Проверка доступен ли урок"""
+
+        # Если урок завершен - всегда доступен (для повторного просмотра)
+        if self.is_completed:
+            return True
+
+        # Если нет available_at - недоступен
         if not self.available_at:
             return False
+
+        # Проверяем время доступности
+        from django.utils import timezone
         return timezone.now() >= self.available_at
 
     def get_duration_seconds(self):
