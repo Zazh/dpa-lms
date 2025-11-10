@@ -113,9 +113,7 @@ class LessonDetailView(APIView):
             response_data.update(self._get_text_lesson_data(lesson, lesson_progress))
 
         elif lesson.lesson_type == 'quiz':
-            response_data['quiz'] = {
-                'message': 'Тест доступен. Перейдите к прохождению.'
-            }
+            response_data.update(self._get_quiz_lesson_data(lesson, request.user))  # ← НОВОЕ
 
         elif lesson.lesson_type == 'assignment':
             response_data['assignment'] = {
@@ -155,6 +153,26 @@ class LessonDetailView(APIView):
             'text': TextLessonDetailSerializer(text_lesson).data,
             'progress': {
                 'is_completed': True  # Всегда true после открытия
+            }
+        }
+
+    def _get_quiz_lesson_data(self, lesson, user):
+        """Данные для теста"""
+        from quizzes.models import QuizLesson
+        from quizzes.serializers import QuizLessonDetailSerializer
+
+        quiz_lesson = get_object_or_404(QuizLesson, lesson=lesson)
+
+        # Получаем прогресс урока
+        lesson_progress = LessonProgress.objects.get(user=user, lesson=lesson)
+
+        return {
+            'quiz': QuizLessonDetailSerializer(
+                quiz_lesson,
+                context={'request': self.request}
+            ).data,
+            'progress': {
+                'is_completed': lesson_progress.is_completed
             }
         }
 

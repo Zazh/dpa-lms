@@ -17,7 +17,7 @@ urlpatterns = [
     path('api/groups/', include('groups.urls')),
     path('api/', include('content.urls')),
     path('api/', include('progress.urls')),
-
+    path('api/quizzes/', include('quizzes.urls')),
 ]
 
 # Для разработки - отдача медиа и статических файлов

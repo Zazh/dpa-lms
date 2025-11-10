@@ -1,0 +1,306 @@
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.db import transaction
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+
+from .models import QuizLesson, QuizAttempt, QuizResponse, QuizQuestion
+from .serializers import (
+    QuizLessonDetailSerializer,
+    QuizSubmitSerializer,
+    QuizResultSerializer,
+    QuizQuestionWithCorrectSerializer,
+    QuizAttemptSerializer
+)
+from progress.models import LessonProgress
+
+
+
+def _format_available_in(available_at):
+    """Форматировать время доступности в человекочитаемый вид"""
+    if not available_at:
+        return None
+
+    delta = available_at - timezone.now()
+
+    if delta.total_seconds() < 0:
+        return "доступен сейчас"
+
+    hours = int(delta.total_seconds() // 3600)
+    minutes = int((delta.total_seconds() % 3600) // 60)
+
+    if hours > 0 and minutes > 0:
+        return f"через {hours} ч. {minutes} мин."
+    elif hours > 0:
+        return f"через {hours} ч."
+    else:
+        return f"через {minutes} мин."
+
+
+@api_view(['POST'])
+def start_quiz(request, quiz_id):
+    """
+    Начать попытку прохождения теста
+
+    POST /api/quizzes/{id}/start/
+    """
+    quiz = get_object_or_404(QuizLesson, id=quiz_id)
+
+
+    # Проверка: может ли пользователь начать тест
+    can_attempt, message = quiz.can_user_attempt(request.user)
+    if not can_attempt:
+        return Response(
+            {'error': message},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Подсчет номера попытки
+    attempts_count = quiz.attempts.filter(user=request.user).count()
+    attempt_number = attempts_count + 1
+
+    # Создание попытки
+    attempt = QuizAttempt.objects.create(
+        user=request.user,
+        quiz=quiz,
+        attempt_number=attempt_number,
+        status='in_progress'
+    )
+
+    # Возвращаем информацию о попытке и вопросы
+    return Response({
+        'attempt_id': attempt.id,
+        'attempt_number': attempt.attempt_number,
+        'started_at': attempt.started_at,
+        'time_limit_minutes': quiz.time_limit_minutes,
+        'quiz': QuizLessonDetailSerializer(quiz, context={'request': request}).data
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_quiz(request, attempt_id):
+    """
+    Отправить ответы и завершить тест
+
+    POST /api/quizzes/attempts/{id}/submit/
+
+    Body:
+    {
+        "answers": [
+            {"question_id": 1, "answer_ids": [2]},
+            {"question_id": 2, "answer_ids": [1, 3]}
+        ]
+    }
+    """
+    attempt = get_object_or_404(
+        QuizAttempt,
+        id=attempt_id,
+        user=request.user
+    )
+
+    # Проверка: попытка еще в процессе?
+    if attempt.status != 'in_progress':
+        return Response(
+            {'error': 'Попытка уже завершена'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Валидация данных
+    serializer = QuizSubmitSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    answers_data = serializer.validated_data['answers']
+
+    # Обработка ответов в транзакции
+    with transaction.atomic():
+        correct_count = 0
+        total_questions = len(answers_data)
+
+        for answer_data in answers_data:
+            question_id = answer_data['question_id']
+            answer_ids = answer_data['answer_ids']
+
+            # Получаем вопрос
+            question = get_object_or_404(
+                QuizQuestion,
+                id=question_id,
+                quiz=attempt.quiz
+            )
+
+            # Создаем ответ пользователя
+            response = QuizResponse.objects.create(
+                attempt=attempt,
+                question=question
+            )
+
+            # Добавляем выбранные ответы
+            response.selected_answers.set(answer_ids)
+
+            # Проверяем правильность и начисляем баллы
+            response.check_answer()
+
+            if response.is_correct:
+                correct_count += 1
+
+        # Завершаем попытку
+        attempt.complete()
+
+        # Проверка: пройден ли тест
+        passed = attempt.is_passed()
+
+        # Подготовка результата
+        result_data = {
+            'success': True,
+            'passed': passed,
+            'score': attempt.score_percentage,
+            'passing_score': attempt.quiz.passing_score,
+            'correct_answers': correct_count,
+            'total_questions': total_questions,
+            'attempt_number': attempt.attempt_number
+        }
+
+        # Если тест пройден - обновляем прогресс урока
+        # Если тест пройден - обновляем прогресс урока
+        if passed:
+            from progress.models import CourseEnrollment
+
+            lesson_progress = LessonProgress.objects.get(
+                user=request.user,
+                lesson=attempt.quiz.lesson
+            )
+
+            # Завершаем урок
+            lesson_progress.mark_completed()
+
+            # Получаем enrollment и курс
+            course = lesson_progress.lesson.module.course
+            enrollment = CourseEnrollment.objects.get(
+                user=request.user,
+                course=course
+            )
+
+            # Подсчитываем прогресс
+            total_lessons = course.get_lessons_count()
+            completed_lessons = LessonProgress.objects.filter(
+                user=request.user,
+                lesson__module__course=course,
+                is_completed=True
+            ).count()
+
+            percentage = (completed_lessons / total_lessons * 100) if total_lessons > 0 else 0
+
+            # Добавляем прогресс курса
+            course_progress_data = {
+                'percentage': round(percentage, 2),
+                'completed_lessons': completed_lessons,
+                'total_lessons': total_lessons
+            }
+            result_data['course_progress'] = course_progress_data
+
+            # Получаем следующий урок
+            next_lesson = lesson_progress.lesson.get_next_lesson()
+
+            # Добавляем следующий урок
+            if next_lesson:
+                next_lesson_progress, created = LessonProgress.objects.get_or_create(
+                    user=request.user,
+                    lesson=next_lesson
+                )
+
+                if created:
+                    next_lesson_progress.calculate_available_at()
+
+                # Форматируем время доступности
+                available_in = _format_available_in(next_lesson_progress.available_at)
+
+                result_data['next_lesson'] = {
+                    'id': next_lesson.id,
+                    'title': next_lesson.title,
+                    'type': next_lesson.lesson_type,
+                    'is_available': next_lesson_progress.is_available(),
+                    'available_in': available_in
+                }
+
+        # Показываем правильные ответы если включено
+        if attempt.quiz.show_correct_answers:
+            questions_with_answers = []
+
+            for response in attempt.responses.all():
+                question_data = QuizQuestionWithCorrectSerializer(response.question).data
+                question_data['user_selected_ids'] = list(
+                    response.selected_answers.values_list('id', flat=True)
+                )
+                question_data['is_correct'] = response.is_correct
+                question_data['points_earned'] = response.points_earned
+                questions_with_answers.append(question_data)
+
+            result_data['questions'] = questions_with_answers
+
+        return Response(result_data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_quiz_attempts(request):
+    """
+    Получить историю попыток пользователя
+
+    GET /api/quizzes/attempts/
+    """
+    attempts = QuizAttempt.objects.filter(
+        user=request.user
+    ).select_related('quiz__lesson').order_by('-started_at')
+
+    serializer = QuizAttemptSerializer(attempts, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def quiz_attempt_detail(request, attempt_id):
+    """
+    Детали конкретной попытки с правильными ответами
+
+    GET /api/quizzes/attempts/{id}/
+    """
+    attempt = get_object_or_404(
+        QuizAttempt,
+        id=attempt_id,
+        user=request.user
+    )
+
+    # Только для завершенных попыток
+    if attempt.status != 'completed':
+        return Response(
+            {'error': 'Попытка еще не завершена'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Только если показ правильных ответов включен
+    if not attempt.quiz.show_correct_answers:
+        return Response(
+            {'error': 'Просмотр правильных ответов отключен'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Формируем детали
+    questions_with_answers = []
+    for response in attempt.responses.all():
+        question_data = QuizQuestionWithCorrectSerializer(response.question).data
+        question_data['user_selected_ids'] = list(
+            response.selected_answers.values_list('id', flat=True)
+        )
+        question_data['is_correct'] = response.is_correct
+        question_data['points_earned'] = response.points_earned
+        questions_with_answers.append(question_data)
+
+    return Response({
+        'attempt': QuizAttemptSerializer(attempt).data,
+        'passed': attempt.is_passed(),
+        'questions': questions_with_answers
+    })
