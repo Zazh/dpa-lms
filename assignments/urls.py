@@ -15,4 +15,7 @@ urlpatterns = [
 
     # Добавить комментарий
     path('submissions/<int:submission_id>/comment/', api_views.add_comment, name='add_comment'),
+
+    path('submissions/<int:submission_id>/grade/', api_views.grade_assignment, name='grade_assignment'),
+
 ]

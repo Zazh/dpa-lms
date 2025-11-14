@@ -214,3 +214,64 @@ def add_comment(request, submission_id):
         'success': True,
         'comment': AssignmentCommentSerializer(comment).data
     }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def grade_assignment(request, submission_id):
+    """
+    Оценить домашнее задание (только преподаватель)
+
+    POST /api/assignments/submissions/{id}/grade/
+
+    Body:
+    {
+        "status": "passed" | "needs_revision" | "failed",
+        "score": 85,  # для passed и failed
+        "feedback": "Хорошая работа!"
+    }
+    """
+    submission = get_object_or_404(AssignmentSubmission, id=submission_id)
+
+    # TODO: Добавьте проверку прав (только преподаватель курса может оценивать)
+    # if not request.user.is_instructor_of_course(submission.assignment.lesson.module.course):
+    #     return Response({'error': 'Нет прав'}, status=status.HTTP_403_FORBIDDEN)
+
+    # Валидация
+    status_value = request.data.get('status')
+    if status_value not in ['passed', 'needs_revision', 'failed']:
+        return Response(
+            {'error': 'Неверный статус'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    feedback = request.data.get('feedback', '')
+    score = request.data.get('score')
+
+    # Применяем оценку
+    if status_value == 'passed':
+        if score is None:
+            return Response(
+                {'error': 'Укажите балл'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        submission.mark_passed(request.user, score, feedback)
+        message = 'Работа зачтена'
+
+    elif status_value == 'needs_revision':
+        submission.mark_needs_revision(request.user, feedback)
+        message = 'Отправлено на доработку'
+
+    else:  # failed
+        score = score or 0
+        submission.mark_failed(request.user, feedback, score)
+        message = 'Работа не зачтена'
+
+    return Response({
+        'success': True,
+        'message': message,
+        'submission': AssignmentSubmissionDetailSerializer(
+            submission,
+            context={'request': request}
+        ).data
+    })

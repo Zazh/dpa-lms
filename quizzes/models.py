@@ -260,15 +260,18 @@ class QuizAttempt(models.Model):
         # Обновить прогресс урока если тест пройден
         if self.is_passed():
             from progress.models import LessonProgress
-            LessonProgress.objects.update_or_create(
+
+            # ИСПРАВЛЕНО: Используем mark_completed() для полной логики
+            lesson_progress, created = LessonProgress.objects.get_or_create(
                 user=self.user,
                 lesson=self.quiz.lesson,
-                defaults={
-                    'is_completed': True,
-                    'completed_at': timezone.now(),
-                    'completion_data': {'quiz_score': float(self.score_percentage)}
-                }
+                defaults={'is_completed': False}
             )
+
+            lesson_progress.mark_completed({
+                'quiz_score': float(self.score_percentage),
+                'quiz_attempt': self.attempt_number
+            })
 
     def get_duration_seconds(self):
         """Длительность попытки в секундах"""

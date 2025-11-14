@@ -165,17 +165,21 @@ def submit_quiz(request, attempt_id):
         }
 
         # Если тест пройден - обновляем прогресс урока
-        # Если тест пройден - обновляем прогресс урока
         if passed:
             from progress.models import CourseEnrollment
 
-            lesson_progress = LessonProgress.objects.get(
+            # ИСПРАВЛЕНО: get_or_create вместо get
+            lesson_progress, created = LessonProgress.objects.get_or_create(
                 user=request.user,
-                lesson=attempt.quiz.lesson
+                lesson=attempt.quiz.lesson,
+                defaults={'is_completed': False}
             )
 
-            # Завершаем урок
-            lesson_progress.mark_completed()
+            # Завершаем урок с данными о тесте
+            lesson_progress.mark_completed({
+                'quiz_score': attempt.score_percentage,
+                'quiz_attempt': attempt.attempt_number
+            })
 
             # Получаем enrollment и курс
             course = lesson_progress.lesson.module.course
