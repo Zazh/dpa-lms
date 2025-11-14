@@ -212,8 +212,8 @@ def submit_quiz(request, attempt_id):
                     lesson=next_lesson
                 )
 
-                if created:
-                    next_lesson_progress.calculate_available_at()
+                # ВСЕГДА пересчитываем доступность после завершения предыдущего
+                next_lesson_progress.calculate_available_at()
 
                 # Форматируем время доступности
                 available_in = _format_available_in(next_lesson_progress.available_at)

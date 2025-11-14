@@ -115,10 +115,8 @@ class LessonDetailView(APIView):
         elif lesson.lesson_type == 'quiz':
             response_data.update(self._get_quiz_lesson_data(lesson, request.user))  # ← НОВОЕ
 
-        elif lesson.lesson_type == 'assignment':
-            response_data['assignment'] = {
-                'message': 'Домашнее задание доступно. Перейдите к выполнению.'
-            }
+        elif lesson.lesson_type == 'assignment':  # ← ДОБАВЬТЕ
+            response_data.update(self._get_assignment_lesson_data(lesson, request.user, lesson_progress))
 
         return Response(response_data)
 
@@ -171,6 +169,35 @@ class LessonDetailView(APIView):
                 quiz_lesson,
                 context={'request': self.request}
             ).data,
+            'progress': {
+                'is_completed': lesson_progress.is_completed
+            }
+        }
+
+    def _get_assignment_lesson_data(self, lesson, user, lesson_progress):  # ← ДОБАВЬТЕ
+        """Данные для домашнего задания"""
+        from assignments.models import AssignmentLesson, AssignmentSubmission
+        from assignments.serializers import AssignmentLessonDetailSerializer
+
+        assignment_lesson = get_object_or_404(AssignmentLesson, lesson=lesson)
+
+        # Получаем последнюю сдачу пользователя
+        last_submission = AssignmentSubmission.objects.filter(
+            user=user,
+            assignment=assignment_lesson
+        ).order_by('-submission_number').first()
+
+        submission_data = None
+        if last_submission:
+            from assignments.serializers import AssignmentSubmissionSerializer
+            submission_data = AssignmentSubmissionSerializer(
+                last_submission,
+                context={'request': self.request}
+            ).data
+
+        return {
+            'assignment': AssignmentLessonDetailSerializer(assignment_lesson).data,
+            'last_submission': submission_data,
             'progress': {
                 'is_completed': lesson_progress.is_completed
             }

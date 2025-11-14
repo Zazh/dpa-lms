@@ -154,8 +154,8 @@ class LessonCompleteView(APIView):
                 defaults={'is_completed': False}
             )
 
-            if created:
-                next_progress.calculate_available_at()
+            # Всегда пересчитываем доступность после завершения предыдущего урока
+            next_progress.calculate_available_at()
 
             next_lesson_data = {
                 'id': next_lesson.id,

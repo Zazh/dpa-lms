@@ -1,0 +1,216 @@
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.shortcuts import get_object_or_404
+from django.db import transaction
+
+from .models import AssignmentLesson, AssignmentSubmission, AssignmentComment
+from .serializers import (
+    AssignmentLessonDetailSerializer,
+    AssignmentSubmissionSerializer,
+    AssignmentSubmissionDetailSerializer,
+    AssignmentSubmitSerializer,
+    CommentCreateSerializer,
+    AssignmentCommentSerializer  # ← ДОБАВЛЕНО
+)
+from progress.models import LessonProgress
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def submit_assignment(request, assignment_id):
+    """
+    Сдать домашнее задание
+
+    POST /api/assignments/{id}/submit/
+
+    Multipart form-data:
+    - submission_text: текст ответа (опционально)
+    - submission_file: файл (опционально)
+    """
+    assignment = get_object_or_404(AssignmentLesson, id=assignment_id)
+
+    # Проверка: зачислен ли на курс
+    try:
+        lesson_progress = LessonProgress.objects.get(
+            user=request.user,
+            lesson=assignment.lesson
+        )
+    except LessonProgress.DoesNotExist:
+        return Response(
+            {'error': 'Вы не зачислены на этот курс'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Проверка: доступен ли урок
+    if not lesson_progress.is_available():
+        return Response(
+            {'error': 'Урок недоступен'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Проверка: уже завершен?
+    if lesson_progress.is_completed:
+        return Response(
+            {'error': 'Задание уже зачтено'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Проверка: есть ли работа на проверке
+    existing_submission = AssignmentSubmission.objects.filter(
+        user=request.user,
+        assignment=assignment,
+        status='in_review'
+    ).first()
+
+    if existing_submission:
+        return Response(
+            {'error': 'У вас уже есть работа на проверке'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Проверка: можно ли пересдать
+    last_submission = AssignmentSubmission.objects.filter(
+        user=request.user,
+        assignment=assignment
+    ).order_by('-submission_number').first()
+
+    if last_submission:
+        if last_submission.status == 'needs_revision':
+            if not assignment.allow_resubmission:
+                return Response(
+                    {'error': 'Пересдача запрещена'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        elif last_submission.status in ['in_review', 'passed']:
+            return Response(
+                {'error': 'Невозможно сдать повторно'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    # Валидация данных
+    serializer = AssignmentSubmitSerializer(
+        data=request.data,
+        context={'assignment': assignment}
+    )
+
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # Определяем номер попытки
+    submission_number = 1
+    if last_submission:
+        submission_number = last_submission.submission_number + 1
+
+    # Создаем сдачу
+    submission = AssignmentSubmission.objects.create(
+        user=request.user,
+        assignment=assignment,
+        submission_number=submission_number,
+        submission_text=serializer.validated_data.get('submission_text', ''),
+        submission_file=serializer.validated_data.get('submission_file'),
+        status='in_review'
+    )
+
+    return Response({
+        'success': True,
+        'message': 'Работа отправлена на проверку',
+        'submission': AssignmentSubmissionDetailSerializer(
+            submission,
+            context={'request': request}
+        ).data
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_submissions(request):
+    """
+    Получить список своих сдач
+
+    GET /api/assignments/my-submissions/
+    """
+    submissions = AssignmentSubmission.objects.filter(
+        user=request.user
+    ).select_related(
+        'assignment__lesson',
+        'reviewed_by'
+    ).order_by('-submitted_at')
+
+    serializer = AssignmentSubmissionSerializer(
+        submissions,
+        many=True,
+        context={'request': request}
+    )
+
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def submission_detail(request, submission_id):
+    """
+    Детали конкретной сдачи
+
+    GET /api/assignments/submissions/{id}/
+    """
+    submission = get_object_or_404(
+        AssignmentSubmission,
+        id=submission_id,
+        user=request.user
+    )
+
+    serializer = AssignmentSubmissionDetailSerializer(
+        submission,
+        context={'request': request}
+    )
+
+    # Отметить комментарии как прочитанные
+    submission.comments.filter(
+        is_read=False
+    ).exclude(
+        author=request.user
+    ).update(is_read=True)
+
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_comment(request, submission_id):
+    """
+    Добавить комментарий к сдаче
+
+    POST /api/assignments/submissions/{id}/comment/
+
+    Body:
+    {
+        "message": "Текст комментария"
+    }
+    """
+    submission = get_object_or_404(
+        AssignmentSubmission,
+        id=submission_id,
+        user=request.user
+    )
+
+    serializer = CommentCreateSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # Создаем комментарий
+    comment = AssignmentComment.objects.create(
+        submission=submission,
+        author=request.user,
+        message=serializer.validated_data['message'],
+        is_instructor=False
+    )
+
+    return Response({
+        'success': True,
+        'comment': AssignmentCommentSerializer(comment).data
+    }, status=status.HTTP_201_CREATED)

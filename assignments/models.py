@@ -164,6 +164,43 @@ class AssignmentSubmission(models.Model):
     def __str__(self):
         return f"{self.user.email} - {self.assignment.lesson.title} (#{self.submission_number})"
 
+    def save(self, *args, **kwargs):
+        """Переопределяем save для автозавершения урока"""
+        if self.pk:
+            try:
+                old_submission = AssignmentSubmission.objects.get(pk=self.pk)
+                if old_submission.status != 'passed' and self.status == 'passed':
+                    # Статус изменен на passed - завершаем урок
+                    super().save(*args, **kwargs)
+
+                    from progress.models import LessonProgress
+                    from django.utils import timezone
+
+                    lesson_progress = LessonProgress.objects.update_or_create(
+                        user=self.user,
+                        lesson=self.assignment.lesson,
+                        defaults={
+                            'is_completed': True,
+                            'completed_at': timezone.now(),
+                            'completion_data': {'assignment_score': self.score}
+                        }
+                    )[0]
+
+                    # ДОБАВЬТЕ ЭТО: Пересчитываем доступность следующего урока
+                    next_lesson = self.assignment.lesson.get_next_lesson()
+                    if next_lesson:
+                        next_lesson_progress, created = LessonProgress.objects.get_or_create(
+                            user=self.user,
+                            lesson=next_lesson
+                        )
+                        next_lesson_progress.calculate_available_at()
+
+                    return
+            except AssignmentSubmission.DoesNotExist:
+                pass
+
+        super().save(*args, **kwargs)
+
     def mark_in_review(self, instructor):
         """Взять на проверку"""
         self.status = 'in_review'
@@ -222,7 +259,7 @@ class AssignmentSubmission(models.Model):
 
         # Обновить прогресс урока
         from progress.models import LessonProgress
-        LessonProgress.objects.update_or_create(
+        lesson_progress = LessonProgress.objects.update_or_create(
             user=self.user,
             lesson=self.assignment.lesson,
             defaults={
@@ -230,7 +267,16 @@ class AssignmentSubmission(models.Model):
                 'completed_at': timezone.now(),
                 'completion_data': {'assignment_score': score}
             }
-        )
+        )[0]
+
+        # ДОБАВЬТЕ: Пересчитываем доступность следующего урока
+        next_lesson = self.assignment.lesson.get_next_lesson()
+        if next_lesson:
+            next_lesson_progress, created = LessonProgress.objects.get_or_create(
+                user=self.user,
+                lesson=next_lesson
+            )
+            next_lesson_progress.calculate_available_at()
 
     def get_score_percentage(self):
         """Процент от максимального балла"""

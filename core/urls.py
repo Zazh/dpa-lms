@@ -18,6 +18,8 @@ urlpatterns = [
     path('api/', include('content.urls')),
     path('api/', include('progress.urls')),
     path('api/quizzes/', include('quizzes.urls')),
+    path('api/assignments/', include('assignments.urls')),
+
 ]
 
 # Для разработки - отдача медиа и статических файлов
