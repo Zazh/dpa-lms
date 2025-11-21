@@ -8,6 +8,14 @@ from groups.models import Group
 class Graduate(models.Model):
     """Выпускник курса"""
 
+    # Статусы выпускника
+    STATUS_CHOICES = [
+        ('pending', '⏳ Закончил обучение (ожидает выпуска)'),
+        ('graduated', '🎓 Выпущен'),
+        ('rejected', '❌ Отклонен'),
+    ]
+
+    # === ОСНОВНАЯ ИНФОРМАЦИЯ ===
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -29,21 +37,51 @@ class Graduate(models.Model):
         blank=True,
         related_name='graduates',
         verbose_name='Группа',
-        help_text='Из какой группы выпустился'
+        help_text='Группа в которой проходил обучение'
     )
 
-    # Дата и результаты
-    graduated_at = models.DateTimeField('Дата выпуска', auto_now_add=True, db_index=True)
+    # === СТАТУС И ДАТЫ ===
+    status = models.CharField(
+        'Статус',
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+        db_index=True
+    )
 
+    completed_at = models.DateTimeField(
+        'Дата завершения обучения',
+        default=timezone.now,
+        db_index=True,
+        help_text='Когда достиг 100% прогресса'
+    )
+
+    graduated_at = models.DateTimeField(
+        'Дата выпуска',
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='Когда менеджер подтвердил выпуск'
+    )
+
+    graduated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='graduated_students',
+        verbose_name='Выпустил (менеджер)'
+    )
+
+    # === РЕЗУЛЬТАТЫ ОБУЧЕНИЯ ===
     final_score = models.DecimalField(
         'Итоговая оценка (%)',
         max_digits=5,
         decimal_places=2,
         default=0,
-        help_text='Средний балл по всем тестам и заданиям'
+        help_text='Средний балл по всем тестам'
     )
 
-    # Статистика обучения
     total_lessons_completed = models.PositiveIntegerField(
         'Уроков завершено',
         default=0
@@ -62,7 +100,15 @@ class Graduate(models.Model):
         help_text='От зачисления до завершения'
     )
 
-    # Сертификат
+    # === ДЕТАЛИ ПРОХОЖДЕНИЯ ===
+    completion_details = models.JSONField(
+        'Детали прохождения',
+        default=dict,
+        blank=True,
+        help_text='Даты прохождения модулей, уроков, попытки тестов'
+    )
+
+    # === СЕРТИФИКАТ ===
     certificate_number = models.CharField(
         'Номер сертификата',
         max_length=50,
@@ -85,55 +131,163 @@ class Graduate(models.Model):
         blank=True
     )
 
-    # Дополнительно
-    notes = models.TextField('Примечания', blank=True)
+    # === ДОПОЛНИТЕЛЬНО ===
+    notes = models.TextField('Примечания менеджера', blank=True)
 
     class Meta:
         verbose_name = 'Выпускник'
         verbose_name_plural = 'Выпускники'
-        ordering = ['-graduated_at']
-        unique_together = [['user', 'course']]  # Один диплом на курс
+        ordering = ['-completed_at']
+        unique_together = [['user', 'course']]
         indexes = [
             models.Index(fields=['user', 'course']),
-            models.Index(fields=['course', '-graduated_at']),
+            models.Index(fields=['status', '-completed_at']),
+            models.Index(fields=['group', 'status']),
             models.Index(fields=['certificate_number']),
         ]
 
     def __str__(self):
-        return f"🎓 {self.user.get_full_name()} - {self.course.title}"
+        status_icon = {
+            'pending': '⏳',
+            'graduated': '🎓',
+            'rejected': '❌'
+        }.get(self.status, '❓')
+        return f"{status_icon} {self.user.get_full_name()} - {self.course.title}"
+
+    # === МЕТОДЫ ===
+
+    def get_instructor(self):
+        """Получить инструктора группы"""
+        if not self.group:
+            return None
+
+        from groups.models import GroupInstructor
+        instructor = GroupInstructor.objects.filter(
+            group=self.group,
+            is_active=True
+        ).first()
+
+        return instructor.instructor if instructor else None
+
+    def get_quiz_attempts_summary(self):
+        """Сводка по попыткам тестов"""
+        from quizzes.models import QuizAttempt
+
+        attempts = QuizAttempt.objects.filter(
+            user=self.user,
+            quiz__lesson__module__course=self.course,
+            status='completed'
+        ).select_related('quiz__lesson').order_by('quiz__lesson__order', 'attempt_number')
+
+        summary = []
+        for attempt in attempts:
+            summary.append({
+                'lesson': attempt.quiz.lesson.title,
+                'attempt_number': attempt.attempt_number,
+                'score': float(attempt.score_percentage),
+                'passed': attempt.is_passed(),
+                'date': attempt.completed_at.strftime('%d.%m.%Y %H:%M') if attempt.completed_at else '-'
+            })
+
+        return summary
+
+    def calculate_completion_details(self):
+        """Рассчитать детали прохождения"""
+        from progress.models import LessonProgress
+        from content.models import Module
+
+        details = {
+            'modules': [],
+            'lessons': [],
+            'quizzes': self.get_quiz_attempts_summary()
+        }
+
+        # Модули
+        modules = Module.objects.filter(course=self.course).order_by('order')
+        for module in modules:
+            module_lessons = LessonProgress.objects.filter(
+                user=self.user,
+                lesson__module=module,
+                is_completed=True
+            )
+
+            if module_lessons.exists():
+                last_completed = module_lessons.order_by('-completed_at').first()
+                details['modules'].append({
+                    'title': module.title,
+                    'order': module.order,
+                    'completed_at': last_completed.completed_at.strftime(
+                        '%d.%m.%Y %H:%M') if last_completed.completed_at else '-'
+                })
+
+        # Уроки
+        lessons = LessonProgress.objects.filter(
+            user=self.user,
+            lesson__module__course=self.course,
+            is_completed=True
+        ).select_related('lesson', 'lesson__module').order_by('lesson__module__order', 'lesson__order')
+
+        for lesson_progress in lessons:
+            details['lessons'].append({
+                'module': lesson_progress.lesson.module.title,
+                'title': lesson_progress.lesson.title,
+                'type': lesson_progress.lesson.get_lesson_type_display(),
+                'completed_at': lesson_progress.completed_at.strftime(
+                    '%d.%m.%Y %H:%M') if lesson_progress.completed_at else '-'
+            })
+
+        return details
 
     def generate_certificate_number(self):
         """Генерация уникального номера сертификата"""
         if not self.certificate_number:
             import uuid
-            year = self.graduated_at.year
+            year = self.completed_at.year
             unique_id = str(uuid.uuid4())[:8].upper()
             self.certificate_number = f"CERT-{year}-{unique_id}"
-            self.save()
+            self.save(update_fields=['certificate_number'])
         return self.certificate_number
 
-    def issue_certificate(self):
-        """Выдать сертификат"""
-        if not self.certificate_issued_at:
-            self.generate_certificate_number()
-            self.certificate_issued_at = timezone.now()
+    def approve_graduation(self, manager):
+        """Подтвердить выпуск (вызывается менеджером)"""
+        if self.status == 'pending':
+            self.status = 'graduated'
+            self.graduated_at = timezone.now()
+            self.graduated_by = manager
+
+            # Генерируем номер сертификата если нет
+            if not self.certificate_number:
+                self.generate_certificate_number()
+
+            # Устанавливаем дату выдачи сертификата
+            if not self.certificate_issued_at:
+                self.certificate_issued_at = timezone.now()
+
             self.save()
 
-            # TODO: Здесь будет генерация PDF сертификата
-            # from certificates.services import CertificateGenerator
-            # generator = CertificateGenerator()
-            # self.certificate_file = generator.generate(self)
-            # self.save()
+            # TODO: Отправить уведомление студенту
+            # from notifications.services import EmailService
+            # EmailService.send_graduation_email(self.user, self)
 
-    def get_certificate_status(self):
-        """Статус сертификата"""
-        if self.certificate_issued_at:
-            return 'issued'  # Выдан
-        return 'pending'  # Ожидает выдачи
+            return True
+        return False
+
+    def reject_graduation(self, manager, reason=''):
+        """Отклонить выпуск"""
+        if self.status == 'pending':
+            self.status = 'rejected'
+            self.graduated_by = manager
+            if reason:
+                self.notes = f"Отклонено: {reason}\n{self.notes}"
+            self.save()
+            return True
+        return False
 
     @classmethod
     def create_from_enrollment(cls, enrollment):
-        """Создать выпускника из зачисления"""
+        """
+        Создать выпускника из зачисления (вызывается автоматически при 100%)
+        """
         from quizzes.models import QuizAttempt
         from django.db.models import Avg
 
@@ -160,47 +314,15 @@ class Graduate(models.Model):
             user=enrollment.user,
             course=enrollment.course,
             group=enrollment.group,
-            final_score=enrollment.progress_percentage,
+            status='pending',
+            final_score=avg_quiz_score,
             total_lessons_completed=enrollment.completed_lessons_count,
             average_quiz_score=avg_quiz_score,
             total_study_days=study_duration
         )
 
+        # Рассчитываем детали
+        graduate.completion_details = graduate.calculate_completion_details()
+        graduate.save(update_fields=['completion_details'])
+
         return graduate
-
-
-class GraduateAchievement(models.Model):
-    """Достижения выпускника"""
-
-    ACHIEVEMENT_TYPES = [
-        ('perfect_score', '💯 Идеальный результат'),
-        ('fast_learner', '⚡ Быстрое обучение'),
-        ('best_student', '🏆 Лучший студент'),
-        ('helpful', '🤝 Помощь другим'),
-        ('active', '🔥 Активный студент'),
-    ]
-
-    graduate = models.ForeignKey(
-        Graduate,
-        on_delete=models.CASCADE,
-        related_name='achievements',
-        verbose_name='Выпускник'
-    )
-
-    achievement_type = models.CharField(
-        'Тип достижения',
-        max_length=50,
-        choices=ACHIEVEMENT_TYPES
-    )
-
-    description = models.TextField('Описание', blank=True)
-    earned_at = models.DateTimeField('Получено', auto_now_add=True)
-
-    class Meta:
-        verbose_name = 'Достижение'
-        verbose_name_plural = 'Достижения'
-        ordering = ['-earned_at']
-        unique_together = [['graduate', 'achievement_type']]
-
-    def __str__(self):
-        return f"{self.get_achievement_type_display()} - {self.graduate.user.get_full_name()}"

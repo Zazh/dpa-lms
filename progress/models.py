@@ -288,21 +288,29 @@ class LessonProgress(models.Model):
                         lesson=next_lesson,
                         defaults={'is_completed': False}
                     )
-                    next_progress.calculate_available_at()  # ← КЛЮЧЕВОЙ МОМЕНТ!
+                    next_progress.calculate_available_at()
 
-                # Если достигнут 100% прогресс - создать выпускника
+                # ✅ ЛОГИКА ВЫПУСКНИКОВ: Если достигнут 100% прогресс
                 if enrollment.progress_percentage >= 100:
                     from graduates.models import Graduate
+
+                    # Создаем выпускника (статус pending)
                     graduate = Graduate.create_from_enrollment(enrollment)
 
                     if graduate:
-                        # Удаляем из группы
-                        if enrollment.group:
-                            enrollment.group.remove_student(self.user)
+                        # ⚠️ НЕ удаляем из группы сразу!
+                        # Менеджер должен видеть группу при подтверждении выпуска
 
-                        # Деактивируем зачисление
+                        # Деактивируем зачисление (доступ закрыт)
                         enrollment.is_active = False
                         enrollment.save()
+
+                        # TODO: Отправить уведомление студенту о завершении
+                        # from notifications.services import EmailService
+                        # EmailService.send_completion_notification(self.user, enrollment.course)
+
+                        print(f"🎓 Студент {self.user.email} завершил курс {enrollment.course.title}!")
+                        print(f"   Создан Graduate ID: {graduate.id} (статус: pending)")
 
             except CourseEnrollment.DoesNotExist:
                 pass
