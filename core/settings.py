@@ -22,7 +22,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'drf_spectacular',
-    
+    'rest_framework_simplejwt.token_blacklist',
+
     # Local apps
     'account',
     'content',
@@ -46,12 +47,15 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# JWT Settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': False,
+
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
+
+    'ROTATE_REFRESH_TOKENS': True,
+
+    'BLACKLIST_AFTER_ROTATION': True,
+
     'UPDATE_LAST_LOGIN': True,
 
     'ALGORITHM': 'HS256',
