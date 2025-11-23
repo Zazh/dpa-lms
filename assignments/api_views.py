@@ -231,7 +231,10 @@ def grade_assignment(request, submission_id):
         "feedback": "Хорошая работа!"
     }
     """
+    print(f"🟢 grade_assignment: START submission_id={submission_id}")  # ← ДОБАВИТЬ
+
     submission = get_object_or_404(AssignmentSubmission, id=submission_id)
+    print(f"🟢 Найдена сдача: {submission}")  # ← ДОБАВИТЬ
 
     # TODO: Добавьте проверку прав (только преподаватель курса может оценивать)
     # if not request.user.is_instructor_of_course(submission.assignment.lesson.module.course):
@@ -239,6 +242,8 @@ def grade_assignment(request, submission_id):
 
     # Валидация
     status_value = request.data.get('status')
+    print(f"🟢 status_value: {status_value}")  # ← ДОБАВИТЬ
+
     if status_value not in ['passed', 'needs_revision', 'failed']:
         return Response(
             {'error': 'Неверный статус'},
@@ -247,6 +252,7 @@ def grade_assignment(request, submission_id):
 
     feedback = request.data.get('feedback', '')
     score = request.data.get('score')
+    print(f"🟢 score: {score}, feedback: {feedback[:50] if feedback else 'нет'}")  # ← ДОБАВИТЬ
 
     # Применяем оценку
     if status_value == 'passed':
@@ -255,17 +261,25 @@ def grade_assignment(request, submission_id):
                 {'error': 'Укажите балл'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        print(f"🟢 Вызываем mark_passed()")  # ← ДОБАВИТЬ
         submission.mark_passed(request.user, score, feedback)
+        print(f"🟢 mark_passed() завершен")  # ← ДОБАВИТЬ
         message = 'Работа зачтена'
 
     elif status_value == 'needs_revision':
+        print(f"🟢 Вызываем mark_needs_revision()")  # ← ДОБАВИТЬ
         submission.mark_needs_revision(request.user, feedback)
+        print(f"🟢 mark_needs_revision() завершен")  # ← ДОБАВИТЬ
         message = 'Отправлено на доработку'
 
     else:  # failed
         score = score or 0
+        print(f"🟢 Вызываем mark_failed()")  # ← ДОБАВИТЬ
         submission.mark_failed(request.user, feedback, score)
+        print(f"🟢 mark_failed() завершен")  # ← ДОБАВИТЬ
         message = 'Работа не зачтена'
+
+    print(f"🟢 grade_assignment: END")  # ← ДОБАВИТЬ
 
     return Response({
         'success': True,

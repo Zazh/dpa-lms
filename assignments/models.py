@@ -223,6 +223,12 @@ class AssignmentSubmission(models.Model):
             is_instructor=True
         )
 
+        from notifications.services import NotificationService
+        NotificationService.notify_homework_needs_revision(
+            user=self.user,
+            assignment_submission=self
+        )
+
     def mark_failed(self, instructor, feedback, score=0):
         """Не зачесть"""
         self.status = 'failed'
@@ -269,7 +275,7 @@ class AssignmentSubmission(models.Model):
             }
         )[0]
 
-        # ДОБАВЬТЕ: Пересчитываем доступность следующего урока
+        # Пересчитываем доступность следующего урока
         next_lesson = self.assignment.lesson.get_next_lesson()
         if next_lesson:
             next_lesson_progress, created = LessonProgress.objects.get_or_create(
@@ -277,6 +283,12 @@ class AssignmentSubmission(models.Model):
                 lesson=next_lesson
             )
             next_lesson_progress.calculate_available_at()
+
+        from notifications.services import NotificationService
+        NotificationService.notify_homework_accepted(
+            user=self.user,
+            assignment_submission=self
+        )
 
     def get_score_percentage(self):
         """Процент от максимального балла"""

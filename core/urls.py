@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/', include('progress.urls')),
     path('api/quizzes/', include('quizzes.urls')),
     path('api/assignments/', include('assignments.urls')),
+    path('api/notifications/', include('notifications.urls')),
 
 ]
 

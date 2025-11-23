@@ -290,6 +290,14 @@ class LessonProgress(models.Model):
                     )
                     next_progress.calculate_available_at()
 
+                    # Уведомление если урок доступен СЕЙЧАС
+                    if next_progress.is_available():
+                        from notifications.services import NotificationService
+                        NotificationService.notify_lesson_available(
+                            user=self.user,
+                            lesson=next_lesson
+                        )
+
                 # ✅ ЛОГИКА ВЫПУСКНИКОВ: Если достигнут 100% прогресс
                 if enrollment.progress_percentage >= 100:
                     from graduates.models import Graduate

@@ -115,7 +115,7 @@ class SetPasswordView(APIView):
 
         token_uuid = serializer.validated_data['token']
         password = serializer.validated_data['password']
-        referral_token = request.data.get('referral_token')  # ← ДОБАВИТЬ (получаем из фронтенда)
+        referral_token = request.data.get('referral_token')
 
         try:
             token = EmailVerificationToken.objects.get(token=token_uuid)
@@ -142,9 +142,13 @@ class SetPasswordView(APIView):
         token.is_used = True
         token.save()
 
+        # ← ДОБАВИТЬ: Отправляем уведомление о завершении регистрации
+        from notifications.services import NotificationService
+        NotificationService.notify_registration_completed(user)
+
         # АВТОМАТИЧЕСКОЕ ЗАЧИСЛЕНИЕ ПО РЕФЕРАЛЬНОЙ ССЫЛКЕ
         enrollment_info = None
-        if referral_token:  # ← ДОБАВИТЬ
+        if referral_token:
             try:
                 from groups.models import Group
                 from progress.models import CourseEnrollment, LessonProgress
@@ -163,7 +167,6 @@ class SetPasswordView(APIView):
                             user=user,
                             course=group.course,
                             group=group,
-                            payment_status='unpaid' if group.is_paid else 'paid',
                             is_active=True
                         )
 
@@ -189,7 +192,7 @@ class SetPasswordView(APIView):
             'email': user.email
         }
 
-        if enrollment_info:  # ← ДОБАВИТЬ
+        if enrollment_info:
             response_data['enrollment'] = enrollment_info
             response_data['message'] = f'Пароль установлен! Вы зачислены на курс "{enrollment_info["course"]}"'
 
