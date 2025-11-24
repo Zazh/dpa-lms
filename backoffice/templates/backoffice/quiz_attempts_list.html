@@ -1,0 +1,123 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Результаты тестов - Backoffice{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Результаты тестов</h1>
+    <p class="mt-2 text-sm text-gray-600">
+        {% if user.is_super_instructor %}
+        Вы видите все попытки студентов
+        {% else %}
+        Вы видите попытки студентов из назначенных вам групп
+        {% endif %}
+    </p>
+</div>
+
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="rounded-md bg-blue-50 p-3">
+                        <span class="text-2xl">📝</span>
+                    </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Всего попыток</dt>
+                        <dd class="text-3xl font-semibold text-gray-900">{{ stats.total }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="rounded-md bg-green-50 p-3">
+                        <span class="text-2xl">✅</span>
+                    </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Сдано</dt>
+                        <dd class="text-3xl font-semibold text-gray-900">{{ stats.passed }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="rounded-md bg-red-50 p-3">
+                        <span class="text-2xl">❌</span>
+                    </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Не сдано</dt>
+                        <dd class="text-3xl font-semibold text-gray-900">{{ stats.failed }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white shadow rounded-lg mb-6">
+    <div class="px-4 py-5 sm:p-6">
+        <div class="flex space-x-4">
+            <a href="?status=completed" class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'completed' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">Завершенные</a>
+            <a href="?status=in_progress" class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'in_progress' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">В процессе</a>
+            <a href="?status=timeout" class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'timeout' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">Время истекло</a>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white shadow overflow-hidden rounded-lg">
+    <ul class="divide-y divide-gray-200">
+        {% for attempt in attempts %}
+        <li>
+            <a href="{% url 'backoffice:quiz_attempt_detail' attempt.id %}" class="block hover:bg-gray-50 transition">
+                <div class="px-4 py-4 sm:px-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-indigo-600 truncate">{{ attempt.quiz.lesson.title }}</p>
+                            <p class="mt-1 text-sm text-gray-500">Студент: {{ attempt.user.get_full_name }}</p>
+                            <p class="mt-1 text-xs text-gray-400">Курс: {{ attempt.quiz.lesson.module.course.title }}</p>
+                        </div>
+                        <div class="ml-4 flex-shrink-0 flex flex-col items-end">
+                            {% if attempt.status == 'completed' %}
+                                {% if attempt.score_percentage >= attempt.quiz.passing_score %}
+                                <p class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    ✅ {{ attempt.score_percentage }}% (Сдано)
+                                </p>
+                                {% else %}
+                                <p class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    ❌ {{ attempt.score_percentage }}% (Не сдано)
+                                </p>
+                                {% endif %}
+                            {% elif attempt.status == 'in_progress' %}
+                            <p class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">⏳ В процессе</p>
+                            {% elif attempt.status == 'timeout' %}
+                            <p class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">⏱️ Время истекло</p>
+                            {% endif %}
+                            <p class="mt-2 text-xs text-gray-500">Попытка #{{ attempt.attempt_number }}</p>
+                            <p class="mt-1 text-xs text-gray-500">{{ attempt.started_at|date:"d.m.Y H:i" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </li>
+        {% empty %}
+        <li class="px-4 py-8 text-center text-gray-500">Нет попыток с выбранным статусом</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

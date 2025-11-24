@@ -4,6 +4,7 @@ from django.utils import timezone
 import uuid
 from datetime import timedelta
 
+
 class UserManager(BaseUserManager):
     """Менеджер для кастомной модели пользователя"""
 
@@ -43,10 +44,37 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     phone = models.CharField(
         max_length=20,
-        blank=True,      # Можно не заполнять в форме
-        null=True,       # Можно хранить NULL в БД
-        unique=True,     # Уникальность
+        blank=True,
+        null=True,
+        unique=True,
         verbose_name='Телефон'
+    )
+
+    # ← ДОБАВИТЬ: Роль пользователя
+    ROLE_CHOICES = [
+        ('student', 'Студент'),
+        ('instructor', 'Инструктор'),
+        ('super_instructor', 'Супер-инструктор'),
+        ('manager', 'Менеджер'),
+        ('super_manager', 'Супер-менеджер'),
+    ]
+
+    role = models.CharField(
+        'Роль',
+        max_length=50,
+        choices=ROLE_CHOICES,
+        default='student',
+        db_index=True,
+        help_text='Роль пользователя в системе'
+    )
+
+    # ← ДОБАВИТЬ: Для инструкторов - назначенные группы
+    assigned_groups = models.ManyToManyField(
+        'groups.Group',
+        blank=True,
+        related_name='assigned_instructors',
+        verbose_name='Назначенные группы',
+        help_text='Группы, к которым у инструктора есть доступ'
     )
 
     is_active = models.BooleanField('Активен', default=True)
@@ -59,7 +87,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []  # email уже является USERNAME_FIELD
+    REQUIRED_FIELDS = []
 
     class Meta:
         verbose_name = 'Пользователь'
@@ -80,7 +108,44 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Возвращает короткое имя пользователя"""
         return self.first_name
 
+    # ← ДОБАВИТЬ: Методы для проверки ролей
+    def is_instructor(self):
+        """Является ли пользователь инструктором (любого уровня)"""
+        return self.role in ['instructor', 'super_instructor']
 
+    def is_super_instructor(self):
+        """Является ли супер-инструктором (доступ ко всем группам)"""
+        return self.role == 'super_instructor'
+
+    def is_manager(self):
+        """Является ли менеджером (любого уровня)"""
+        return self.role in ['manager', 'super_manager']
+
+    def is_super_manager(self):
+        """Является ли супер-менеджером"""
+        return self.role == 'super_manager'
+
+    def is_backoffice_user(self):
+        """Имеет ли доступ к backoffice (любая роль кроме студента)"""
+        return self.role != 'student'
+
+    def get_accessible_groups(self):
+        """
+        Получить группы, к которым у пользователя есть доступ
+        - Супер-инструктор: все активные группы
+        - Инструктор: только назначенные группы
+        """
+        from groups.models import Group
+
+        if self.is_super_instructor():
+            return Group.objects.filter(is_active=True)
+        elif self.is_instructor():
+            return self.assigned_groups.filter(is_active=True)
+        else:
+            return Group.objects.none()
+
+
+# Остальные модели без изменений
 class EmailVerificationToken(models.Model):
     """Токен для подтверждения email и установки пароля"""
 

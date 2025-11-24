@@ -1,0 +1,16 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Доступ запрещен{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full text-center">
+        <div class="text-6xl mb-4">🚫</div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Доступ запрещен</h1>
+        <p class="text-gray-600 mb-6">У вас нет прав для доступа к этому разделу</p>
+        <a href="/admin/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+            Вернуться в админку
+        </a>
+    </div>
+</div>
+{% endblock %}

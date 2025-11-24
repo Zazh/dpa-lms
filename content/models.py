@@ -313,6 +313,10 @@ class VideoLesson(models.Model):
         """Получить URL для embed Vimeo"""
         return f"https://player.vimeo.com/video/{self.vimeo_video_id}"
 
+    def get_thumbnail_url(self):
+        """Получить URL обложки видео"""
+        return f"https://vumbnail.com/{self.vimeo_video_id}.jpg"
+
     def format_duration(self):
         """Форматировать длительность в читаемый вид"""
         minutes = self.video_duration // 60

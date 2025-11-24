@@ -1,0 +1,43 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Группы - Backoffice{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Группы</h1>
+    <p class="mt-2 text-sm text-gray-600">
+        {% if user.is_super_instructor %}
+        Вы видите все активные группы
+        {% else %}
+        Вы видите только назначенные вам группы
+        {% endif %}
+    </p>
+</div>
+
+<div class="bg-white shadow overflow-hidden rounded-lg">
+    <ul class="divide-y divide-gray-200">
+        {% for group in groups %}
+        <li>
+            <a href="{% url 'backoffice:group_detail' group.id %}" class="block hover:bg-gray-50 transition">
+                <div class="px-4 py-4 sm:px-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-indigo-600">{{ group.name }}</p>
+                            <p class="mt-1 text-sm text-gray-500">Курс: {{ group.course.title }}</p>
+                        </div>
+                        <div class="ml-4 flex-shrink-0 flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-sm text-gray-900">👥 {{ group.students_count }} студентов</p>
+                                <p class="text-xs text-gray-500">Создана: {{ group.created_at|date:"d.m.Y" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </li>
+        {% empty %}
+        <li class="px-4 py-8 text-center text-gray-500">Нет доступных групп</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

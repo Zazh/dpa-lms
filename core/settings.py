@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'progress',
     'graduates',
     'notifications',
+    'backoffice',
 
 ]
 

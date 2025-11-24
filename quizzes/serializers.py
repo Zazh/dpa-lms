@@ -96,15 +96,39 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_questions(self, obj):
-        """Получить вопросы теста"""
-        questions = obj.questions.all().order_by('order')
+        """Получить вопросы с учетом перемешивания"""
 
-        # Перемешивание если включено
-        if obj.shuffle_questions:
-            questions = list(questions)
-            random.shuffle(questions)
+        # Проверяем есть ли предопределенный порядок из контекста
+        questions = self.context.get('questions')
 
-        return QuizQuestionSerializer(questions, many=True).data
+        if questions is None:
+            # Если порядка нет - берем из базы
+            questions = list(obj.questions.all().order_by('order'))
+
+            # Перемешиваем если нужно
+            if obj.shuffle_questions:
+                random.shuffle(questions)
+
+        # Сериализуем вопросы
+        serialized_questions = []
+        for question in questions:
+            # Получаем ответы
+            answers = list(question.answers.all().order_by('order'))
+
+            # Перемешиваем ответы если нужно
+            if obj.shuffle_answers:
+                random.shuffle(answers)
+
+            # Сохраняем порядок ответов для этого вопроса
+            answers_order = [a.id for a in answers]
+
+            question_data = QuizQuestionSerializer(question).data
+            question_data['answers'] = QuizAnswerSerializer(answers, many=True).data
+            question_data['answers_order'] = answers_order  # ← ДОБАВЛЯЕМ ПОРЯДОК
+
+            serialized_questions.append(question_data)
+
+        return serialized_questions
 
     def get_can_attempt(self, obj):
         """Может ли пользователь пройти тест"""

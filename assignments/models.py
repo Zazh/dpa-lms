@@ -215,13 +215,6 @@ class AssignmentSubmission(models.Model):
         self.reviewed_at = timezone.now()
         self.save()
 
-        # Добавить системный комментарий
-        AssignmentComment.objects.create(
-            submission=self,
-            author=instructor,
-            message=f"Требуется доработка:\n{feedback}",
-            is_instructor=True
-        )
 
         from notifications.services import NotificationService
         NotificationService.notify_homework_needs_revision(
@@ -238,13 +231,6 @@ class AssignmentSubmission(models.Model):
         self.reviewed_at = timezone.now()
         self.save()
 
-        # Добавить системный комментарий
-        AssignmentComment.objects.create(
-            submission=self,
-            author=instructor,
-            message=f"Не зачтено. Балл: {score}\n{feedback}",
-            is_instructor=True
-        )
 
     def mark_passed(self, instructor, score, feedback=''):
         """Зачесть"""
@@ -254,14 +240,6 @@ class AssignmentSubmission(models.Model):
         self.feedback = feedback
         self.reviewed_at = timezone.now()
         self.save()
-
-        # Добавить системный комментарий
-        AssignmentComment.objects.create(
-            submission=self,
-            author=instructor,
-            message=f"Зачтено! Балл: {score}\n{feedback}",
-            is_instructor=True
-        )
 
         # Обновить прогресс урока
         from progress.models import LessonProgress

@@ -76,6 +76,14 @@ class QuizLesson(models.Model):
         """Может ли пользователь пройти тест (проверка попыток и задержки)"""
         attempts = self.attempts.filter(user=user).order_by('-started_at')
 
+        # Проверка, что тест уже сдан
+        passed_attempts = attempts.filter(
+            status='completed',
+            score_percentage__gte=self.passing_score
+        )
+        if passed_attempts.exists():
+            return False, 'Тест уже сдан'
+
         # Проверка количества попыток
         if self.max_attempts > 0:
             if attempts.count() >= self.max_attempts:
@@ -215,6 +223,13 @@ class QuizAttempt(models.Model):
         blank=True
     )
 
+    questions_order = models.JSONField(
+        'Порядок вопросов',
+        default=list,
+        blank=True,
+        help_text='Список ID вопросов в порядке показа студенту'
+    )
+
     started_at = models.DateTimeField('Начало', auto_now_add=True, db_index=True)
     completed_at = models.DateTimeField('Завершение', null=True, blank=True)
 
@@ -301,6 +316,13 @@ class QuizResponse(models.Model):
         QuizAnswer,
         related_name='selected_by',
         verbose_name='Выбранные ответы'
+    )
+
+    answers_order = models.JSONField(
+        'Порядок ответов',
+        default=list,
+        blank=True,
+        help_text='Список ID ответов в порядке показа студенту'
     )
 
     is_correct = models.BooleanField('Правильно', default=False)

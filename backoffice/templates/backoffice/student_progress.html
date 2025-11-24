@@ -1,0 +1,78 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Прогресс {{ student.get_full_name }} - Backoffice{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <nav class="flex" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-4">
+            <li><a href="{% url 'backoffice:groups_list' %}" class="text-gray-400 hover:text-gray-500">Группы</a></li>
+            <li>
+                <div class="flex items-center">
+                    <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <a href="{% url 'backoffice:group_detail' group.id %}" class="ml-4 text-gray-400 hover:text-gray-500">{{ group.name }}</a>
+                </div>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="ml-4 text-sm font-medium text-gray-500">{{ student.get_full_name }}</span>
+                </div>
+            </li>
+        </ol>
+    </nav>
+</div>
+
+<div class="bg-white shadow rounded-lg mb-6">
+    <div class="px-4 py-5 sm:p-6">
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">{{ student.get_full_name }}</h1>
+        <dl class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Email</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ student.email }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Группа</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ group.name }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Прогресс</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ enrollment.progress }}%</dd>
+            </div>
+        </dl>
+    </div>
+</div>
+
+<div class="bg-white shadow overflow-hidden rounded-lg">
+    <div class="px-4 py-5 sm:p-6 border-b border-gray-200">
+        <h2 class="text-lg font-medium text-gray-900">Прогресс по урокам</h2>
+    </div>
+    <ul class="divide-y divide-gray-200">
+        {% for progress in lessons_progress %}
+        <li class="px-4 py-4 sm:px-6">
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-900">{{ progress.lesson.title }}</p>
+                    <p class="mt-1 text-xs text-gray-500">{{ progress.lesson.module.title }}</p>
+                </div>
+                <div class="ml-4 flex-shrink-0">
+                    {% if progress.is_completed %}
+                    <span class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">✅ Завершен</span>
+                    {% elif progress.is_available %}
+                    <span class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">🔓 Доступен</span>
+                    {% else %}
+                    <span class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">🔒 Закрыт</span>
+                    {% endif %}
+                </div>
+            </div>
+        </li>
+        {% empty %}
+        <li class="px-4 py-8 text-center text-gray-500">Нет данных о прогрессе</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

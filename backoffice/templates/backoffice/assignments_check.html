@@ -1,0 +1,147 @@
+{% extends 'backoffice/base.html' %}
+
+{% block title %}Проверка ДЗ - Backoffice{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Проверка домашних заданий</h1>
+    <p class="mt-2 text-sm text-gray-600">
+        {% if user.is_super_instructor %}
+        Вы видите все работы студентов
+        {% else %}
+        Вы видите работы студентов из назначенных вам групп
+        {% endif %}
+    </p>
+</div>
+
+<!-- Статистика -->
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="rounded-md bg-yellow-50 p-3">
+                        <span class="text-2xl">🔍</span>
+                    </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">На проверке</dt>
+                        <dd class="text-3xl font-semibold text-gray-900">{{ stats.in_review }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="rounded-md bg-orange-50 p-3">
+                        <span class="text-2xl">✏️</span>
+                    </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Требует доработки</dt>
+                        <dd class="text-3xl font-semibold text-gray-900">{{ stats.needs_revision }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="rounded-md bg-green-50 p-3">
+                        <span class="text-2xl">✅</span>
+                    </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Зачтено</dt>
+                        <dd class="text-3xl font-semibold text-gray-900">{{ stats.passed }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="bg-white shadow rounded-lg mb-6">
+    <div class="px-4 py-5 sm:p-6">
+        <div class="flex space-x-4">
+            <a href="?status=in_review" 
+               class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'in_review' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                На проверке
+            </a>
+            <a href="?status=needs_revision" 
+               class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'needs_revision' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                Требует доработки
+            </a>
+            <a href="?status=passed" 
+               class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'passed' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                Зачтено
+            </a>
+            <a href="?status=failed" 
+               class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'failed' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                Не зачтено
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Список работ -->
+<div class="bg-white shadow overflow-hidden rounded-lg">
+    <ul class="divide-y divide-gray-200">
+        {% for submission in submissions %}
+        <li>
+            <a href="{% url 'backoffice:assignment_detail' submission.id %}" class="block hover:bg-gray-50 transition">
+                <div class="px-4 py-4 sm:px-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-indigo-600 truncate">
+                                {{ submission.assignment.lesson.title }}
+                            </p>
+                            <p class="mt-1 text-sm text-gray-500">
+                                Студент: {{ submission.user.get_full_name }}
+                            </p>
+                            <p class="mt-1 text-xs text-gray-400">
+                                Курс: {{ submission.assignment.lesson.module.course.title }}
+                            </p>
+                        </div>
+                        <div class="ml-4 flex-shrink-0 flex flex-col items-end">
+                            <p class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full
+                               {% if submission.status == 'in_review' %}bg-yellow-100 text-yellow-800
+                               {% elif submission.status == 'needs_revision' %}bg-orange-100 text-orange-800
+                               {% elif submission.status == 'passed' %}bg-green-100 text-green-800
+                               {% elif submission.status == 'failed' %}bg-red-100 text-red-800
+                               {% endif %}">
+                                {{ submission.get_status_display }}
+                            </p>
+                            <p class="mt-2 text-xs text-gray-500">
+                                Сдано: {{ submission.submitted_at|date:"d.m.Y H:i" }}
+                            </p>
+                            {% if submission.reviewed_at %}
+                            <p class="mt-1 text-xs text-gray-500">
+                                Проверено: {{ submission.reviewed_at|date:"d.m.Y H:i" }}
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </li>
+        {% empty %}
+        <li class="px-4 py-8 text-center text-gray-500">
+            Нет работ с выбранным статусом
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+{% endblock %}

@@ -21,6 +21,8 @@ urlpatterns = [
     path('api/assignments/', include('assignments.urls')),
     path('api/notifications/', include('notifications.urls')),
 
+    path('backoffice/', include('backoffice.urls')),
+
 ]
 
 # Для разработки - отдача медиа и статических файлов
