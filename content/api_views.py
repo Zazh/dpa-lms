@@ -131,7 +131,10 @@ class LessonDetailView(APIView):
         )
 
         return {
-            'video': VideoLessonDetailSerializer(video_lesson).data,
+            'video': VideoLessonDetailSerializer(
+                video_lesson,
+                context={'request': self.request}
+            ).data,
             'progress': {
                 'is_completed': LessonProgress.objects.get(user=user, lesson=lesson).is_completed,
                 'watch_percentage': float(video_progress.watch_percentage),

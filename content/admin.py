@@ -146,7 +146,7 @@ class VideoLessonInline(admin.StackedInline):
     """Inline для видео-урока"""
     model = VideoLesson
     extra = 0
-    fields = ['vimeo_video_id', 'video_duration', 'completion_threshold', 'timecodes']
+    fields = ['vimeo_video_id', 'video_duration', 'completion_threshold', 'timecodes', 'thumbnail']
 
     def has_add_permission(self, request, obj=None):
         # Можно добавить только если тип урока - video
@@ -281,7 +281,7 @@ class LessonAdmin(admin.ModelAdmin):
 class VideoLessonAdmin(admin.ModelAdmin):
     list_display = ['lesson', 'vimeo_video_id', 'formatted_duration', 'completion_threshold']
     search_fields = ['lesson__title', 'vimeo_video_id']
-    readonly_fields = ['formatted_duration', 'embed_url']
+    readonly_fields = ['formatted_duration', 'embed_url', 'thumbnail_preview']
 
     fieldsets = (
         ('Связь с уроком', {
@@ -289,6 +289,9 @@ class VideoLessonAdmin(admin.ModelAdmin):
         }),
         ('Настройки видео', {
             'fields': ('vimeo_video_id', 'video_duration', 'formatted_duration', 'embed_url', 'completion_threshold')
+        }),
+        ('Обложка', {  # ← ДОБАВИТЬ
+            'fields': ('thumbnail', 'thumbnail_preview')
         }),
         ('Дополнительно', {
             'fields': ('timecodes',),
@@ -316,6 +319,22 @@ class VideoLessonAdmin(admin.ModelAdmin):
         return '-'
 
     embed_url.short_description = 'Embed URL'
+
+    def has_thumbnail(self, obj):
+        return '✅ Да' if obj.thumbnail else '❌ Нет'
+
+    has_thumbnail.short_description = 'Обложка'
+
+    def thumbnail_preview(self, obj):
+        if obj.thumbnail:
+            return format_html(
+                '<img src="{}" style="max-width: 400px; max-height: 225px; border-radius: 8px;" />',
+                obj.thumbnail.url
+            )
+        return 'Нет обложки'
+
+    thumbnail_preview.short_description = 'Превью обложки'
+
 
 @admin.register(TextLesson)
 class TextLessonAdmin(admin.ModelAdmin):

@@ -14,29 +14,6 @@ class LessonMaterialSerializer(serializers.ModelSerializer):
         return obj.get_file_size()
 
 
-class LessonListSerializer(serializers.ModelSerializer):
-    """Урок в списке (для структуры курса)"""
-    type = serializers.CharField(source='lesson_type')
-    type_display = serializers.CharField(source='get_lesson_type_display')
-
-    class Meta:
-        model = Lesson
-        fields = ['id', 'title', 'description', 'type', 'type_display', 'order']
-
-
-class ModuleSerializer(serializers.ModelSerializer):
-    """Модуль с уроками"""
-    lessons = LessonListSerializer(many=True, read_only=True)
-    lessons_count = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Module
-        fields = ['id', 'title', 'description', 'order', 'requires_previous_module', 'lessons_count', 'lessons']
-
-    def get_lessons_count(self, obj):
-        return obj.get_lessons_count()
-
-
 class CourseListSerializer(serializers.ModelSerializer):
     """Курс в каталоге (список)"""
     modules_count = serializers.SerializerMethodField()
@@ -64,6 +41,70 @@ class CourseListSerializer(serializers.ModelSerializer):
             course=obj,
             is_active=True
         ).exists()
+
+
+
+
+
+class VideoLessonDetailSerializer(serializers.ModelSerializer):
+    """Детали видео-урока"""
+    embed_url = serializers.SerializerMethodField()
+    formatted_duration = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VideoLesson
+        fields = ['vimeo_video_id', 'embed_url', 'video_duration', 'formatted_duration', 'completion_threshold','thumbnail_url',
+                  'timecodes']
+
+    def get_embed_url(self, obj):
+        return obj.get_vimeo_embed_url()
+
+    def get_formatted_duration(self, obj):
+        return obj.format_duration()
+
+    def get_thumbnail_url(self, obj):
+        if obj.thumbnail:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.thumbnail.url)
+            # Fallback если нет request в context
+            from django.conf import settings
+            return f"{settings.MEDIA_URL}{obj.thumbnail.name}"
+        return None
+
+
+class LessonListSerializer(serializers.ModelSerializer):
+    """Урок в списке (для структуры курса)"""
+    type = serializers.CharField(source='lesson_type')
+    type_display = serializers.CharField(source='get_lesson_type_display')
+    videolesson = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Lesson
+        fields = ['id', 'title', 'description', 'type', 'type_display', 'order', 'videolesson']
+
+    def get_videolesson(self, obj):
+        """Получить данные видео-урока с передачей context"""
+        if obj.lesson_type == 'video' and hasattr(obj, 'videolesson'):
+            return VideoLessonDetailSerializer(
+                obj.videolesson,
+                context=self.context
+            ).data
+        return None
+
+
+class ModuleSerializer(serializers.ModelSerializer):
+    """Модуль с уроками"""
+    lessons = LessonListSerializer(many=True, read_only=True)
+    lessons_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Module
+        fields = ['id', 'title', 'description', 'order', 'requires_previous_module', 'lessons_count', 'lessons']
+
+    def get_lessons_count(self, obj):
+        return obj.get_lessons_count()
 
 
 class CourseDetailSerializer(serializers.ModelSerializer):
@@ -95,23 +136,6 @@ class CourseDetailSerializer(serializers.ModelSerializer):
             course=obj,
             is_active=True
         ).exists()
-
-
-class VideoLessonDetailSerializer(serializers.ModelSerializer):
-    """Детали видео-урока"""
-    embed_url = serializers.SerializerMethodField()
-    formatted_duration = serializers.SerializerMethodField()
-
-    class Meta:
-        model = VideoLesson
-        fields = ['vimeo_video_id', 'embed_url', 'video_duration', 'formatted_duration', 'completion_threshold',
-                  'timecodes']
-
-    def get_embed_url(self, obj):
-        return obj.get_vimeo_embed_url()
-
-    def get_formatted_duration(self, obj):
-        return obj.format_duration()
 
 
 class TextLessonDetailSerializer(serializers.ModelSerializer):

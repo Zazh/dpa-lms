@@ -15,7 +15,7 @@ class VideoProgressSerializer(serializers.ModelSerializer):
 
 class LessonProgressSerializer(serializers.ModelSerializer):
     """Прогресс урока с доступностью"""
-    lesson = LessonListSerializer(read_only=True)
+    lesson = serializers.SerializerMethodField()
     is_available = serializers.SerializerMethodField()
     available_at = serializers.DateTimeField(read_only=True)
     available_in = serializers.SerializerMethodField()
@@ -24,7 +24,15 @@ class LessonProgressSerializer(serializers.ModelSerializer):
     class Meta:
         model = LessonProgress
         fields = ['id', 'lesson', 'is_completed', 'is_available', 'available_at', 'available_in',
-                  'started_at', 'completed_at', 'video_duration']  # ← добавили video_duration
+                  'started_at', 'completed_at', 'video_duration']
+
+    def get_lesson(self, obj):
+        """Получить данные урока с передачей context"""
+        from content.serializers import LessonListSerializer
+        return LessonListSerializer(
+            obj.lesson,
+            context=self.context
+        ).data
 
     def get_is_available(self, obj):
         return obj.is_available()
@@ -78,9 +86,9 @@ class ModuleProgressSerializer(serializers.Serializer):
     description = serializers.CharField()
     order = serializers.IntegerField()
     lessons = LessonProgressSerializer(many=True)
-    completed_lessons = serializers.IntegerField()  # ← НОВОЕ
-    total_lessons = serializers.IntegerField()  # ← НОВОЕ
-    progress_percentage = serializers.CharField()  # ← НОВОЕ
+    completed_lessons = serializers.IntegerField()
+    total_lessons = serializers.IntegerField()
+    progress_percentage = serializers.CharField()
 
 
 class CourseProgressSerializer(serializers.ModelSerializer):
@@ -120,13 +128,11 @@ class CourseProgressSerializer(serializers.ModelSerializer):
         result = []
 
         for module in modules:
-            # Уроки модуля с прогрессом
             lessons_progress = LessonProgress.objects.filter(
                 user=obj.user,
                 lesson__module=module
             ).select_related('lesson').order_by('lesson__order')
 
-            # Статистика модуля
             total_lessons = lessons_progress.count()
             completed_lessons = lessons_progress.filter(is_completed=True).count()
             progress_percentage = (completed_lessons / total_lessons * 100) if total_lessons > 0 else 0
@@ -136,10 +142,15 @@ class CourseProgressSerializer(serializers.ModelSerializer):
                 'title': module.title,
                 'description': module.description,
                 'order': module.order,
-                'lessons': LessonProgressSerializer(lessons_progress, many=True).data,
-                'completed_lessons': completed_lessons,  # ← НОВОЕ
-                'total_lessons': total_lessons,  # ← НОВОЕ
-                'progress_percentage': f"{progress_percentage:.2f}"  # ← НОВОЕ
+                # ✅ ИСПРАВИТЬ:
+                'lessons': LessonProgressSerializer(
+                    lessons_progress,
+                    many=True,
+                    context=self.context  # ← ДОБАВИТЬ!
+                ).data,
+                'completed_lessons': completed_lessons,
+                'total_lessons': total_lessons,
+                'progress_percentage': f"{progress_percentage:.2f}"
             })
 
         return result

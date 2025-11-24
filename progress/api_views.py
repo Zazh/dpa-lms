@@ -58,7 +58,10 @@ class CourseProgressView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        serializer = CourseProgressSerializer(enrollment)
+        serializer = CourseProgressSerializer(
+            enrollment,
+            context={'request': request}
+        )
         return Response(serializer.data)
 
 

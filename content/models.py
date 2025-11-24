@@ -2,7 +2,10 @@ from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
-
+from PIL import Image
+from io import BytesIO
+from django.core.files.uploadedfile import InMemoryUploadedFile
+import sys
 
 class Course(models.Model):
     """Курс обучения"""
@@ -302,6 +305,15 @@ class VideoLesson(models.Model):
         help_text='Список таймкодов: [{"time": 120, "label": "Введение"}]'
     )
 
+    # ✅ ДОБАВИТЬ:
+    thumbnail = models.ImageField(
+        'Обложка видео',
+        upload_to='video_thumbnails/%Y/%m/',
+        blank=True,
+        null=True,
+        help_text='Рекомендуемый размер: 1280x720px'
+    )
+
     class Meta:
         verbose_name = 'Видео-урок'
         verbose_name_plural = 'Видео-уроки'
@@ -309,13 +321,52 @@ class VideoLesson(models.Model):
     def __str__(self):
         return f"Видео: {self.lesson.title}"
 
+    def save(self, *args, **kwargs):
+        """Автоматическое сжатие и конвертация обложки в WebP"""
+        if self.thumbnail:
+            self.thumbnail = self._compress_thumbnail(self.thumbnail)
+        super().save(*args, **kwargs)
+
+    def _compress_thumbnail(self, image_field):
+        """Сжать и конвертировать изображение в WebP"""
+        img = Image.open(image_field)
+
+        # Конвертируем в RGB (WebP не поддерживает RGBA с хорошим сжатием)
+        if img.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+
+        # Ресайз если слишком большое (макс 1920 по ширине)
+        max_width = 1920
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_size = (max_width, int(img.height * ratio))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+        # Сохраняем в WebP с качеством 85
+        output = BytesIO()
+        img.save(output, format='WEBP', quality=85, method=6)
+        output.seek(0)
+
+        # Создаем новый файл
+        filename = image_field.name.rsplit('.', 1)[0] + '.webp'
+        return InMemoryUploadedFile(
+            output,
+            'ImageField',
+            filename,
+            'image/webp',
+            sys.getsizeof(output),
+            None
+        )
+
     def get_vimeo_embed_url(self):
         """Получить URL для embed Vimeo"""
         return f"https://player.vimeo.com/video/{self.vimeo_video_id}"
-
-    def get_thumbnail_url(self):
-        """Получить URL обложки видео"""
-        return f"https://vumbnail.com/{self.vimeo_video_id}.jpg"
 
     def format_duration(self):
         """Форматировать длительность в читаемый вид"""
