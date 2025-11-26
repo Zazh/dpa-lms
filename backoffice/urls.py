@@ -25,4 +25,9 @@ urlpatterns = [
     path('quizzes/', views.quiz_attempts_list, name='quiz_attempts_list'),
     path('quizzes/<int:attempt_id>/', views.quiz_attempt_detail, name='quiz_attempt_detail'),
 
+    # Выпускники
+    path('graduates/', views.graduates_list, name='graduates_list'),
+    path('graduates/<int:graduate_id>/', views.graduate_detail, name='graduate_detail'),
+    path('graduates/bulk-action/', views.graduates_bulk_action, name='graduates_bulk_action'),
+
 ]

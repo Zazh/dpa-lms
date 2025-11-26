@@ -5,6 +5,7 @@ from .decorators import backoffice_required, instructor_required
 from groups.models import Group, GroupMembership
 from assignments.models import AssignmentSubmission
 from progress.models import CourseEnrollment
+from graduates.models import Graduate
 
 
 @backoffice_required
@@ -344,3 +345,187 @@ def assignments_check(request):
     }
 
     return render(request, 'backoffice/assignments_check.html', context)
+
+
+@backoffice_required
+def graduates_list(request):
+    """Список выпускников (для менеджеров и супер-инструкторов)"""
+
+    user = request.user
+
+    # Фильтры
+    status_filter = request.GET.get('status', 'pending')
+    group_filter = request.GET.get('group', '')
+    course_filter = request.GET.get('course', '')
+
+    # Базовый queryset
+    graduates = Graduate.objects.select_related(
+        'user',
+        'course',
+        'group',
+        'graduated_by'
+    )
+
+    # Фильтр по группам для обычного инструктора
+    if not user.is_super_instructor() and not user.is_manager():
+        accessible_groups = user.get_accessible_groups()
+        if accessible_groups.exists():
+            graduates = graduates.filter(group__in=accessible_groups)
+
+    # Применяем фильтры
+    if status_filter:
+        graduates = graduates.filter(status=status_filter)
+
+    if group_filter:
+        graduates = graduates.filter(group_id=group_filter)
+
+    if course_filter:
+        graduates = graduates.filter(course_id=course_filter)
+
+    graduates = graduates.order_by('-completed_at')
+
+    # Статистика
+    all_graduates = Graduate.objects.all()
+    if not user.is_super_instructor() and not user.is_manager():
+        accessible_groups = user.get_accessible_groups()
+        if accessible_groups.exists():
+            all_graduates = all_graduates.filter(group__in=accessible_groups)
+
+    stats = {
+        'pending': all_graduates.filter(status='pending').count(),
+        'graduated': all_graduates.filter(status='graduated').count(),
+        'rejected': all_graduates.filter(status='rejected').count(),
+    }
+
+    # Списки для фильтров
+    from content.models import Course
+    groups = Group.objects.filter(is_active=True)
+    courses = Course.objects.filter(is_active=True)
+
+    context = {
+        'graduates': graduates,
+        'status_filter': status_filter,
+        'group_filter': group_filter,
+        'course_filter': course_filter,
+        'stats': stats,
+        'groups': groups,
+        'courses': courses,
+    }
+
+    return render(request, 'backoffice/graduates_list.html', context)
+
+
+@backoffice_required
+def graduate_detail(request, graduate_id):
+    """Детали выпускника + загрузка сертификата"""
+
+    graduate = get_object_or_404(Graduate, id=graduate_id)
+
+    # Проверка доступа
+    user = request.user
+    if not user.is_super_instructor() and not user.is_manager():
+        accessible_groups = user.get_accessible_groups()
+        if graduate.group not in accessible_groups:
+            messages.error(request, 'У вас нет доступа к этому выпускнику')
+            return redirect('backoffice:graduates_list')
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        # Загрузить сертификат
+        if action == 'upload_certificate':
+            certificate_file = request.FILES.get('certificate_file')
+
+            if not certificate_file:
+                messages.error(request, 'Выберите файл сертификата')
+            elif not certificate_file.name.endswith('.pdf'):
+                messages.error(request, 'Файл должен быть в формате PDF')
+            else:
+                graduate.certificate_file = certificate_file
+                graduate.save()
+                messages.success(request, 'Сертификат загружен!')
+                return redirect('backoffice:graduate_detail', graduate_id=graduate_id)
+
+        # Выпустить студента
+        elif action == 'approve':
+            if not graduate.certificate_file:
+                messages.error(request, 'Сначала загрузите сертификат')
+            elif graduate.status != 'pending':
+                messages.error(request, 'Можно выпустить только студента со статусом "Ожидает выпуска"')
+            else:
+                graduate.approve_graduation(request.user)
+                messages.success(request, f'🎓 Студент {graduate.user.get_full_name()} выпущен!')
+                return redirect('backoffice:graduates_list')
+
+        # Отклонить
+        elif action == 'reject':
+            reason = request.POST.get('reason', '')
+            if graduate.status != 'pending':
+                messages.error(request, 'Можно отклонить только студента со статусом "Ожидает выпуска"')
+            else:
+                graduate.reject_graduation(request.user, reason)
+                messages.warning(request, f'Студент {graduate.user.get_full_name()} отклонен')
+                return redirect('backoffice:graduates_list')
+
+    # Попытки тестов
+    quiz_attempts = graduate.get_quiz_attempts_summary()
+
+    context = {
+        'graduate': graduate,
+        'quiz_attempts': quiz_attempts,
+    }
+
+    return render(request, 'backoffice/graduate_detail.html', context)
+
+
+@backoffice_required
+def graduates_bulk_action(request):
+    """Массовые действия с выпускниками"""
+
+    if request.method != 'POST':
+        return redirect('backoffice:graduates_list')
+
+    action = request.POST.get('action')
+    graduate_ids = request.POST.getlist('graduate_ids')
+
+    if not graduate_ids:
+        messages.error(request, 'Не выбраны выпускники')
+        return redirect('backoffice:graduates_list')
+
+    graduates = Graduate.objects.filter(id__in=graduate_ids)
+
+    # Проверка доступа
+    user = request.user
+    if not user.is_super_instructor() and not user.is_manager():
+        accessible_groups = user.get_accessible_groups()
+        graduates = graduates.filter(group__in=accessible_groups)
+
+    if action == 'approve':
+        # Массовый выпуск
+        count = 0
+        errors = []
+
+        for graduate in graduates.filter(status='pending'):
+            if graduate.certificate_file:
+                graduate.approve_graduation(request.user)
+                count += 1
+            else:
+                errors.append(f'{graduate.user.get_full_name()} - нет сертификата')
+
+        if count > 0:
+            messages.success(request, f'🎓 Выпущено студентов: {count}')
+
+        if errors:
+            messages.warning(request, f'Пропущено (нет сертификата): {len(errors)}')
+
+    elif action == 'reject':
+        # Массовое отклонение
+        count = 0
+        for graduate in graduates.filter(status='pending'):
+            graduate.reject_graduation(request.user)
+            count += 1
+
+        if count > 0:
+            messages.warning(request, f'Отклонено студентов: {count}')
+
+    return redirect('backoffice:graduates_list')

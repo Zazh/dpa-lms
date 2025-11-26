@@ -1,0 +1,226 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Выпускники - Backoffice{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-gray-900">Выпускники</h1>
+    <p class="mt-2 text-sm text-gray-600">Управление выпуском студентов и сертификатами</p>
+</div>
+
+<!-- Статистика -->
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-3 mb-8">
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="rounded-md bg-yellow-50 p-3">
+                        <span class="text-2xl">⏳</span>
+                    </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Ожидают выпуска</dt>
+                        <dd class="text-3xl font-semibold text-gray-900">{{ stats.pending }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="rounded-md bg-green-50 p-3">
+                        <span class="text-2xl">🎓</span>
+                    </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Выпущены</dt>
+                        <dd class="text-3xl font-semibold text-gray-900">{{ stats.graduated }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="bg-white overflow-hidden shadow rounded-lg">
+        <div class="p-5">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="rounded-md bg-red-50 p-3">
+                        <span class="text-2xl">❌</span>
+                    </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Отклонены</dt>
+                        <dd class="text-3xl font-semibold text-gray-900">{{ stats.rejected }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="bg-white shadow rounded-lg mb-6">
+    <div class="px-4 py-5 sm:p-6">
+        <form method="get" class="flex flex-wrap gap-4 items-end">
+            <!-- Статус -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Статус</label>
+                <select name="status" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">Все</option>
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>⏳ Ожидают выпуска</option>
+                    <option value="graduated" {% if status_filter == 'graduated' %}selected{% endif %}>🎓 Выпущены</option>
+                    <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>❌ Отклонены</option>
+                </select>
+            </div>
+            
+            <!-- Группа -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Группа</label>
+                <select name="group" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">Все группы</option>
+                    {% for group in groups %}
+                    <option value="{{ group.id }}" {% if group_filter == group.id|stringformat:'s' %}selected{% endif %}>{{ group.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Курс -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Курс</label>
+                <select name="course" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">Все курсы</option>
+                    {% for course in courses %}
+                    <option value="{{ course.id }}" {% if course_filter == course.id|stringformat:'s' %}selected{% endif %}>{{ course.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                Применить
+            </button>
+            
+            <a href="{% url 'backoffice:graduates_list' %}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
+                Сбросить
+            </a>
+        </form>
+    </div>
+</div>
+
+<!-- Форма массовых действий -->
+<form method="post" action="{% url 'backoffice:graduates_bulk_action' %}" id="bulk-form">
+    {% csrf_token %}
+    
+    <!-- Массовые действия -->
+    {% if graduates %}
+    <div class="bg-white shadow rounded-lg mb-4">
+        <div class="px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <label class="flex items-center">
+                    <input type="checkbox" id="select-all" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="ml-2 text-sm text-gray-600">Выбрать все</span>
+                </label>
+                <span class="text-sm text-gray-500" id="selected-count">Выбрано: 0</span>
+            </div>
+            <div class="flex space-x-2">
+                <button type="submit" name="action" value="approve" class="px-4 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 disabled:opacity-50" id="btn-approve">
+                    🎓 Выпустить выбранных
+                </button>
+                <button type="submit" name="action" value="reject" class="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 disabled:opacity-50" id="btn-reject">
+                    ❌ Отклонить выбранных
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Список выпускников -->
+    <div class="bg-white shadow overflow-hidden rounded-lg">
+        <ul class="divide-y divide-gray-200">
+            {% for graduate in graduates %}
+            <li class="hover:bg-gray-50">
+                <div class="px-4 py-4 sm:px-6 flex items-center">
+                    <!-- Чекбокс -->
+                    <div class="flex-shrink-0 mr-4">
+                        <input type="checkbox" name="graduate_ids" value="{{ graduate.id }}" class="graduate-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    </div>
+                    
+                    <!-- Основная информация -->
+                    <a href="{% url 'backoffice:graduate_detail' graduate.id %}" class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-indigo-600 truncate">{{ graduate.user.get_full_name }}</p>
+                                <p class="mt-1 text-xs text-gray-500">{{ graduate.user.email }} | ИИН: {{ graduate.user.iin }}</p>
+                                <p class="mt-1 text-xs text-gray-400">
+                                    Курс: {{ graduate.course.title }} | 
+                                    Группа: {{ graduate.group.name|default:'Без группы' }}
+                                </p>
+                            </div>
+                            <div class="ml-4 flex-shrink-0 flex flex-col items-end">
+                                <!-- Статус -->
+                                {% if graduate.status == 'pending' %}
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    ⏳ Ожидает выпуска
+                                </span>
+                                {% elif graduate.status == 'graduated' %}
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                    🎓 Выпущен
+                                </span>
+                                {% elif graduate.status == 'rejected' %}
+                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                                    ❌ Отклонен
+                                </span>
+                                {% endif %}
+                                
+                                <!-- Сертификат -->
+                                <span class="mt-1 text-xs {% if graduate.certificate_file %}text-green-600{% else %}text-gray-400{% endif %}">
+                                    {% if graduate.certificate_file %}📜 Сертификат загружен{% else %}📄 Нет сертификата{% endif %}
+                                </span>
+                                
+                                <!-- Дата -->
+                                <span class="mt-1 text-xs text-gray-400">
+                                    Завершил: {{ graduate.completed_at|date:'d.m.Y' }}
+                                </span>
+                                
+                                <!-- Оценка -->
+                                <span class="mt-1 text-xs font-medium text-gray-600">
+                                    Оценка: {{ graduate.final_score|floatformat:0 }}%
+                                </span>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </li>
+            {% empty %}
+            <li class="px-4 py-8 text-center text-gray-500">
+                Нет выпускников с выбранными фильтрами
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</form>
+
+<script>
+// Выбрать все
+document.getElementById('select-all')?.addEventListener('change', function() {
+    document.querySelectorAll('.graduate-checkbox').forEach(cb => cb.checked = this.checked);
+    updateSelectedCount();
+});
+
+// Обновить счетчик
+document.querySelectorAll('.graduate-checkbox').forEach(cb => {
+    cb.addEventListener('change', updateSelectedCount);
+});
+
+function updateSelectedCount() {
+    const count = document.querySelectorAll('.graduate-checkbox:checked').length;
+    document.getElementById('selected-count').textContent = 'Выбрано: ' + count;
+}
+</script>
+{% endblock %}

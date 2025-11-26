@@ -244,7 +244,7 @@ class Graduate(models.Model):
             import uuid
             year = self.completed_at.year
             unique_id = str(uuid.uuid4())[:8].upper()
-            self.certificate_number = f"CERT-{year}-{unique_id}"
+            self.certificate_number = f"KZ-{year}-{unique_id}"
             self.save(update_fields=['certificate_number'])
         return self.certificate_number
 
@@ -265,9 +265,9 @@ class Graduate(models.Model):
 
             self.save()
 
-            # TODO: Отправить уведомление студенту
-            # from notifications.services import EmailService
-            # EmailService.send_graduation_email(self.user, self)
+            # Отправить уведомление студенту
+            from notifications.services import NotificationService
+            NotificationService.notify_graduation(self.user, self)
 
             return True
         return False

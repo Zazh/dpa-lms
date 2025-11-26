@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'graduates',
     'notifications',
     'backoffice',
+    'dossier',
 
 ]
 

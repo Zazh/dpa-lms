@@ -130,3 +130,29 @@ class NotificationService:
         if prefs.homework_needs_revision_email:
             EmailService.send_homework_needs_revision_email(user, assignment_submission)
             logger.info(f"Отправлен email о доработке ДЗ для {user.email}")
+
+    @classmethod
+    def notify_graduation(cls, user, graduate):
+        """
+        Уведомление: выпуск подтвержден
+        Вызывается когда менеджер подтверждает выпуск студента
+        """
+        logger.info(f"Отправка уведомления о выпуске для {user.email}")
+
+        prefs = cls._get_user_preferences(user)
+
+        # 1. In-app уведомление
+        if prefs.graduation_in_app:
+            Notification.objects.create(
+                user=user,
+                type='graduation',
+                title='🎓 Поздравляем с выпуском!',
+                message=f'Вы успешно завершили курс "{graduate.course.title}" и получили сертификат! Номер сертификата: {graduate.certificate_number}',
+                link='/profile/certificates/'
+            )
+            logger.info(f"Создано in-app уведомление о выпуске для {user.email}")
+
+        # 2. Email уведомление
+        if prefs.graduation_email:
+            EmailService.send_graduation_email(user, graduate)
+            logger.info(f"Отправлен email о выпуске для {user.email}")

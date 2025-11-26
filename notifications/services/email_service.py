@@ -393,3 +393,71 @@ class EmailService:
 
         email_log.save()
         return email_log
+
+    @classmethod
+    def send_graduation_email(cls, user, graduate) -> EmailLog:
+        """Отправить письмо о выпуске"""
+
+        certificate_link = f"{settings.FRONTEND_URL}/profile/certificates/"
+
+        text_content = f"""
+    🎓 ПОЗДРАВЛЯЕМ С ВЫПУСКОМ!
+    
+    Здравствуйте, {user.first_name}!
+    
+    Мы рады сообщить, что вы успешно завершили обучение!
+    
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    📚 Курс: {graduate.course.title}
+    📅 Дата завершения: {graduate.completed_at.strftime('%d.%m.%Y')}
+    📜 Номер сертификата: {graduate.certificate_number}
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
+    Ваш сертификат доступен для скачивания в личном кабинете:
+    {certificate_link}
+    
+    Желаем вам успехов в применении полученных знаний!
+    
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    С уважением,
+    Команда Aerialsolutions.kz
+    
+    Контакты:
+    Email: support@aerialsolutions.kz
+    Сайт: https://aerialsolutions.kz
+    
+    Это автоматическое письмо, не отвечайте на него.
+    Если у вас возникли вопросы, напишите на support@aerialsolutions.kz
+        """
+
+        email_log = EmailLog.objects.create(
+            user=user,
+            recipient=user.email,
+            email_type='email_verification',  # 'graduation' в EMAIL_TYPES
+            subject='🎓 Поздравляем с выпуском!',
+            status='pending'
+        )
+
+        try:
+            sendpulse = SendPulseService()
+            result = sendpulse.send_email(
+                to_email=user.email,
+                subject=f'🎓 Поздравляем с выпуском! Курс "{graduate.course.title}"',
+                html_content=text_content
+            )
+
+            if result['success']:
+                email_log.status = 'sent'
+                email_log.sent_at = timezone.now()
+                email_log.sendpulse_response = result.get('response')
+            else:
+                email_log.status = 'failed'
+                email_log.error_message = result['message']
+
+        except Exception as e:
+            email_log.status = 'failed'
+            email_log.error_message = str(e)
+            logger.error(f"Error sending graduation email: {e}")
+
+        email_log.save()
+        return email_log

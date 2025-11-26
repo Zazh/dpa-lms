@@ -69,6 +69,7 @@ class Notification(models.Model):
         ('homework_needs_revision', 'Домашнее задание требует доработки'),
         ('course_enrolled', 'Зачисление на курс'),
         ('course_completed', 'Курс завершен'),
+        ('graduation', 'Выпуск подтвержден'),
         ('promotion', 'Акция'),
         ('support_reply', 'Ответ поддержки'),
         ('bulk_notification', 'Массовая рассылка'),
@@ -234,6 +235,20 @@ class NotificationPreference(models.Model):
     )
     system_in_app = models.BooleanField(
         'In-app: системные',
+        default=True
+    )
+
+    # === Выпуск подтвержден ===
+    graduation_email = models.BooleanField(
+        'Email: выпуск подтвержден',
+        default=True
+    )
+    graduation_push = models.BooleanField(
+        'Push: выпуск подтвержден',
+        default=True
+    )
+    graduation_in_app = models.BooleanField(
+        'In-app: выпуск подтвержден',
         default=True
     )
 
