@@ -269,6 +269,10 @@ class Graduate(models.Model):
             from notifications.services import NotificationService
             NotificationService.notify_graduation(self.user, self)
 
+            # Создать досье студента
+            from dossier.services import DossierService
+            DossierService.create_student_dossier(self)
+
             return True
         return False
 

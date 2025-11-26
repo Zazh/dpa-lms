@@ -529,3 +529,135 @@ def graduates_bulk_action(request):
             messages.warning(request, f'Отклонено студентов: {count}')
 
     return redirect('backoffice:graduates_list')
+
+
+from dossier.models import StudentDossier, InstructorDossier
+
+
+@backoffice_required
+def student_dossiers_list(request):
+    """Список досье студентов"""
+
+    user = request.user
+
+    # Проверка доступа - только супер-менеджер и супер-инструктор
+    if not (user.is_super_instructor() or user.is_super_manager()):
+        messages.error(request, 'Доступ к досье только для супер-менеджеров и супер-инструкторов')
+        return redirect('backoffice:dashboard')
+
+    # Фильтры
+    search = request.GET.get('search', '')
+    course_filter = request.GET.get('course', '')
+
+    dossiers = StudentDossier.objects.all()
+
+    if search:
+        dossiers = dossiers.filter(
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search) |
+            Q(email__icontains=search) |
+            Q(iin__icontains=search) |
+            Q(certificate_number__icontains=search)
+        )
+
+    if course_filter:
+        dossiers = dossiers.filter(course_title__icontains=course_filter)
+
+    dossiers = dossiers.order_by('-graduated_at')
+
+    # Статистика
+    stats = {
+        'total': StudentDossier.objects.count(),
+    }
+
+    context = {
+        'dossiers': dossiers,
+        'search': search,
+        'course_filter': course_filter,
+        'stats': stats,
+    }
+
+    return render(request, 'backoffice/student_dossiers_list.html', context)
+
+
+@backoffice_required
+def student_dossier_detail(request, dossier_id):
+    """Детали досье студента"""
+
+    user = request.user
+
+    # Проверка доступа
+    if not (user.is_super_instructor() or user.is_super_manager()):
+        messages.error(request, 'Доступ к досье только для супер-менеджеров и супер-инструкторов')
+        return redirect('backoffice:dashboard')
+
+    dossier = get_object_or_404(StudentDossier, id=dossier_id)
+
+    context = {
+        'dossier': dossier,
+    }
+
+    return render(request, 'backoffice/student_dossier_detail.html', context)
+
+
+@backoffice_required
+def instructor_dossiers_list(request):
+    """Список досье инструкторов"""
+
+    user = request.user
+
+    # Проверка доступа
+    if not (user.is_super_instructor() or user.is_super_manager()):
+        messages.error(request, 'Доступ к досье только для супер-менеджеров и супер-инструкторов')
+        return redirect('backoffice:dashboard')
+
+    search = request.GET.get('search', '')
+
+    dossiers = InstructorDossier.objects.all()
+
+    if search:
+        dossiers = dossiers.filter(
+            Q(first_name__icontains=search) |
+            Q(last_name__icontains=search) |
+            Q(email__icontains=search)
+        )
+
+    dossiers = dossiers.order_by('-total_graduates')
+
+    # Статистика
+    stats = {
+        'total': InstructorDossier.objects.count(),
+    }
+
+    context = {
+        'dossiers': dossiers,
+        'search': search,
+        'stats': stats,
+    }
+
+    return render(request, 'backoffice/instructor_dossiers_list.html', context)
+
+
+@backoffice_required
+def instructor_dossier_detail(request, dossier_id):
+    """Детали досье инструктора"""
+
+    user = request.user
+
+    # Проверка доступа
+    if not (user.is_super_instructor() or user.is_super_manager()):
+        messages.error(request, 'Доступ к досье только для супер-менеджеров и супер-инструкторов')
+        return redirect('backoffice:dashboard')
+
+    dossier = get_object_or_404(InstructorDossier, id=dossier_id)
+
+    # Обновить досье при просмотре
+    if dossier.user:
+        from dossier.services import DossierService
+        dossier = DossierService.create_or_update_instructor_dossier(dossier.user)
+
+    context = {
+        'dossier': dossier,
+    }
+
+    return render(request, 'backoffice/instructor_dossier_detail.html', context)

@@ -1,0 +1,206 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Досье: {{ dossier.get_full_name }} - Backoffice{% endblock %}
+
+{% block content %}
+
+<!-- Хлебные крошки -->
+<div class="mb-6">
+    <nav class="flex" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-4">
+            <li>
+                <a href="{% url 'backoffice:instructor_dossiers_list' %}" class="text-gray-400 hover:text-gray-500">Досье инструкторов</a>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="ml-4 text-sm font-medium text-gray-500">{{ dossier.get_full_name }}</span>
+                </div>
+            </li>
+        </ol>
+    </nav>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Левая колонка -->
+    <div class="lg:col-span-2 space-y-6">
+        
+        <!-- Личные данные -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">👤 Личные данные</h2>
+                
+                <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">ФИО</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-medium">{{ dossier.get_full_name }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Email</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ dossier.email }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Телефон</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ dossier.phone|default:"Не указан" }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Роль</dt>
+                        <dd class="mt-1">
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full 
+                                {% if dossier.role == 'super_instructor' %}bg-purple-100 text-purple-800
+                                {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ dossier.role }}
+                            </span>
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Дата регистрации</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ dossier.registered_at|date:"d.m.Y" }}</dd>
+                    </div>
+                </dl>
+                
+                {% if not dossier.user %}
+                <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <p class="text-sm text-yellow-800">⚠️ Профиль пользователя удален. Данные сохранены в досье.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- История групп -->
+        {% if dossier.groups_history %}
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">👥 История групп</h2>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Группа</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Курс</th>
+                                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500">Студентов</th>
+                                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500">Выпустил</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for group in dossier.groups_history %}
+                            <tr>
+                                <td class="px-4 py-2 text-sm text-gray-900">{{ group.group_name }}</td>
+                                <td class="px-4 py-2 text-sm text-gray-500">{{ group.course_title }}</td>
+                                <td class="px-4 py-2 text-center text-sm text-gray-900">{{ group.students_count }}</td>
+                                <td class="px-4 py-2 text-center text-sm font-medium text-green-600">{{ group.graduates_count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Статистика проверок по месяцам -->
+        {% if dossier.reviews_summary.by_month %}
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h2 class="text-lg font-medium text-gray-900 mb-4">📊 Проверки ДЗ по месяцам</h2>
+                
+                <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                    {% for month in dossier.reviews_summary.by_month %}
+                    <div class="text-center p-3 bg-gray-50 rounded-lg">
+                        <p class="text-xs text-gray-500">{{ month.month|slice:":7" }}</p>
+                        <p class="text-xl font-bold text-indigo-600">{{ month.count }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+    </div>
+    
+    <!-- Правая колонка -->
+    <div class="space-y-6">
+        
+        <!-- Статистика -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">📈 Статистика</h3>
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center p-3 bg-indigo-50 rounded-lg">
+                            <p class="text-xs text-indigo-600">Групп вел</p>
+                            <p class="text-2xl font-bold text-indigo-700">{{ dossier.total_groups_led }}</p>
+                        </div>
+                        <div class="text-center p-3 bg-green-50 rounded-lg">
+                            <p class="text-xs text-green-600">Выпустил</p>
+                            <p class="text-2xl font-bold text-green-700">{{ dossier.total_graduates }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center p-3 bg-blue-50 rounded-lg">
+                        <p class="text-xs text-blue-600">Студентов обучил</p>
+                        <p class="text-2xl font-bold text-blue-700">{{ dossier.total_students_taught }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Проверка ДЗ -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">📝 Проверка ДЗ</h3>
+                
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-500">Всего проверено</span>
+                        <span class="text-lg font-bold text-gray-900">{{ dossier.total_assignments_reviewed }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-500">Зачтено</span>
+                        <span class="text-lg font-bold text-green-600">{{ dossier.total_assignments_passed }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-500">На доработку</span>
+                        <span class="text-lg font-bold text-orange-600">{{ dossier.total_assignments_rejected }}</span>
+                    </div>
+                    <div class="border-t pt-3 flex justify-between items-center">
+                        <span class="text-sm text-gray-500">Средняя оценка</span>
+                        <span class="text-lg font-bold text-indigo-600">{{ dossier.average_score_given|floatformat:0 }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Мета-информация -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-sm font-medium text-gray-500 mb-3">Информация о досье</h3>
+                
+                <div class="space-y-2 text-xs text-gray-500">
+                    <p>ID досье: {{ dossier.id }}</p>
+                    <p>Создано: {{ dossier.dossier_created_at|date:"d.m.Y H:i" }}</p>
+                    <p>Обновлено: {{ dossier.last_updated_at|date:"d.m.Y H:i" }}</p>
+                    {% if dossier.user %}
+                    <p>User ID: {{ dossier.user.id }}</p>
+                    {% else %}
+                    <p class="text-yellow-600">Пользователь удален</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Назад -->
+        <a href="{% url 'backoffice:instructor_dossiers_list' %}" class="block w-full text-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            ← Назад к списку
+        </a>
+        
+    </div>
+    
+</div>
+
+{% endblock %}

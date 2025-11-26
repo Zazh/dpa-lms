@@ -18,7 +18,7 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_superuser(self, email, iin, first_name, last_name, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         extra_fields.setdefault('is_active', True)
@@ -28,6 +28,11 @@ class UserManager(BaseUserManager):
             raise ValueError('Superuser должен иметь is_staff=True.')
         if extra_fields.get('is_superuser') is not True:
             raise ValueError('Superuser должен иметь is_superuser=True.')
+
+        # Передаём обязательные поля
+        extra_fields['iin'] = iin
+        extra_fields['first_name'] = first_name
+        extra_fields['last_name'] = last_name
 
         return self.create_user(email, password, **extra_fields)
 
@@ -87,7 +92,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = []
+    REQUIRED_FIELDS = ['iin', 'first_name', 'last_name']
 
     class Meta:
         verbose_name = 'Пользователь'

@@ -30,4 +30,13 @@ urlpatterns = [
     path('graduates/<int:graduate_id>/', views.graduate_detail, name='graduate_detail'),
     path('graduates/bulk-action/', views.graduates_bulk_action, name='graduates_bulk_action'),
 
+
+    # Досье студентов
+    path('dossier/students/', views.student_dossiers_list, name='student_dossiers_list'),
+    path('dossier/students/<int:dossier_id>/', views.student_dossier_detail, name='student_dossier_detail'),
+
+    # Досье инструкторов
+    path('dossier/instructors/', views.instructor_dossiers_list, name='instructor_dossiers_list'),
+    path('dossier/instructors/<int:dossier_id>/', views.instructor_dossier_detail, name='instructor_dossier_detail'),
+
 ]

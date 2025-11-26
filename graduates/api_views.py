@@ -82,7 +82,7 @@ class DownloadCertificateView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # Проверка что файл существует
+        # Проверка, что файл существует
         if not graduate.certificate_file:
             return Response(
                 {'error': 'Сертификат еще не загружен'},
