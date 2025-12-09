@@ -2,7 +2,7 @@ import re
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from .models import EmailVerificationToken, PasswordResetToken
+from .models import EmailVerificationToken, PasswordResetToken, EgovAuthSession
 
 User = get_user_model()
 
@@ -202,4 +202,67 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
                 return clean_phone
 
+        return None
+
+
+class EgovInitSerializer(serializers.Serializer):
+    """Ответ на инициализацию eGov авторизации"""
+    session_id = serializers.CharField()
+    qr_code = serializers.CharField(help_text='Base64 изображение QR кода')
+    egov_mobile_link = serializers.CharField(allow_null=True)
+    egov_business_link = serializers.CharField(allow_null=True)
+    expires_in = serializers.IntegerField(help_text='Секунд до истечения')
+
+
+class EgovCheckStatusSerializer(serializers.Serializer):
+    """Запрос проверки статуса eGov авторизации"""
+    session_id = serializers.CharField()
+
+
+class EgovStatusResponseSerializer(serializers.Serializer):
+    """Ответ на проверку статуса"""
+    status = serializers.ChoiceField(choices=['pending', 'signed', 'completed', 'expired', 'error'])
+
+    # Если пользователь найден - возвращаем токены
+    access = serializers.CharField(required=False)
+    refresh = serializers.CharField(required=False)
+    user = UserSerializer(required=False)
+
+    # Если пользователь НЕ найден - данные для регистрации
+    needs_registration = serializers.BooleanField(required=False)
+    registration_data = serializers.DictField(required=False)
+    registration_token = serializers.CharField(required=False)
+
+
+class EgovRegistrationSerializer(serializers.Serializer):
+    """Завершение регистрации после eGov авторизации"""
+    registration_token = serializers.CharField()
+    email = serializers.EmailField()
+    phone = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_email(self, value):
+        value = value.lower().strip()
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Пользователь с таким email уже существует")
+        return value
+
+    def validate_phone(self, value):
+        if value:
+            value = value.strip()
+            if value in ['', '+7']:
+                return None
+
+            clean_phone = re.sub(r'[^\d+]', '', value)
+            if clean_phone:
+                if not clean_phone.startswith('+7'):
+                    raise serializers.ValidationError("Телефон должен начинаться с +7")
+
+                digits_only = clean_phone.replace('+', '')
+                if len(digits_only) != 11:
+                    raise serializers.ValidationError("Телефон должен содержать 11 цифр")
+
+                if User.objects.filter(phone=clean_phone).exists():
+                    raise serializers.ValidationError("Пользователь с таким телефоном уже зарегистрирован")
+
+                return clean_phone
         return None

@@ -203,3 +203,53 @@ class PasswordResetToken(models.Model):
 
     def __str__(self):
         return f"Password reset token for {self.user.email}"
+
+
+class EgovAuthSession(models.Model):
+    """Сессия авторизации через eGov QR"""
+
+    STATUS_CHOICES = [
+        ('pending', 'Ожидание подписи'),
+        ('signed', 'Подписано'),
+        ('completed', 'Завершено'),
+        ('expired', 'Истекло'),
+        ('error', 'Ошибка'),
+    ]
+
+    qr_id = models.CharField('Sigex QR ID', max_length=100, unique=True, db_index=True)
+    status = models.CharField('Статус', max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    # Данные из сертификата (заполняются после подписания)
+    iin = models.CharField('ИИН', max_length=12, blank=True, null=True)
+    first_name = models.CharField('Имя', max_length=150, blank=True, null=True)
+    last_name = models.CharField('Фамилия', max_length=150, blank=True, null=True)
+    middle_name = models.CharField('Отчество', max_length=150, blank=True, null=True)
+
+    # Связь с пользователем (если найден существующий)
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='egov_sessions'
+    )
+
+    created_at = models.DateTimeField('Создано', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлено', auto_now=True)
+    expires_at = models.DateTimeField('Истекает')
+
+    class Meta:
+        verbose_name = 'Сессия eGov авторизации'
+        verbose_name_plural = 'Сессии eGov авторизации'
+        db_table = 'egov_auth_sessions'
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=5)
+        super().save(*args, **kwargs)
+
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def __str__(self):
+        return f"EgovAuth {self.qr_id} - {self.status}"

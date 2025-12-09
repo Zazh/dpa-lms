@@ -174,6 +174,11 @@ DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@lms.kz')
 # Frontend URL
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
 
+# Sigex eGov Authentication
+SIGEX_API_URL = 'https://sigex.kz'
+# Для аутентификации данные для подписания (простая строка)
+SIGEX_AUTH_DATA = 'LMS Authentication Request'
+
 
 # SendPulse Configuration
 SENDPULSE_API_ID = config('SENDPULSE_API_ID', default='')

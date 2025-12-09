@@ -1,15 +1,15 @@
-from rest_framework import status
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
+import logging
+
 from django.contrib.auth import authenticate, get_user_model
+from drf_spectacular.utils import extend_schema
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from notifications.services import EmailService
-
-from django.conf import settings
-from django.utils import timezone
-
+from .models import EmailVerificationToken, PasswordResetToken, EgovAuthSession
 from .serializers import (
     CheckEmailSerializer,
     UserRegistrationSerializer,
@@ -18,9 +18,15 @@ from .serializers import (
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
     UserSerializer,
-    UserUpdateSerializer
+    UserUpdateSerializer,
+    EgovInitSerializer,
+    EgovCheckStatusSerializer,
+    EgovStatusResponseSerializer,
+    EgovRegistrationSerializer,
 )
-from .models import EmailVerificationToken, PasswordResetToken
+from .services import SigexAuthService
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -319,3 +325,230 @@ class UserProfileView(APIView):
             'message': 'Профиль успешно обновлен',
             'user': UserSerializer(request.user).data
         })
+
+@extend_schema(
+    tags=['eGov Auth'],
+    summary='Инициализация eGov авторизации',
+    description='Создаёт сессию для авторизации через eGov Mobile QR',
+    responses={200: EgovInitSerializer}
+)
+class EgovInitView(APIView):
+    """Инициализация QR-подписания через eGov Mobile"""
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="Инициализация eGov авторизации",
+        description="Создает новую сессию для авторизации через eGov Mobile QR",
+        responses={200: EgovInitSerializer}
+    )
+    def post(self, request):
+        try:
+            # Сначала создаём сессию чтобы получить ID
+            session = EgovAuthSession.objects.create(
+                qr_id='pending',  # временное значение
+                status='pending'
+            )
+
+            # Вызываем сервис с ID сессии
+            result = SigexAuthService.init_qr_signing(session.id)
+
+            # Обновляем qr_id
+            session.qr_id = result['qr_id']
+            session.save()
+
+            response_data = {
+                'session_id': str(session.id),
+                'qr_code': result['qr_code'],
+                'egov_mobile_link': result['egov_mobile_link'],
+                'egov_business_link': result['egov_business_link'],
+                'expires_in': 300
+            }
+
+            serializer = EgovInitSerializer(response_data)
+            return Response(serializer.data)
+
+        except Exception as e:
+            logger.error(f'EgovInitView error: {e}')
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+@extend_schema(
+    tags=['eGov Auth'],
+    summary='Проверка статуса eGov авторизации',
+    description='Проверяет, подписал ли пользователь запрос в eGov Mobile',
+    request=EgovCheckStatusSerializer,
+    responses={200: EgovStatusResponseSerializer}
+)
+class EgovCheckStatusView(APIView):
+    """Проверка статуса авторизации через eGov"""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        session_id = request.data.get('session_id')
+
+        if not session_id:
+            return Response(
+                {'error': 'session_id обязателен'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            session = EgovAuthSession.objects.get(id=session_id)
+        except EgovAuthSession.DoesNotExist:
+            return Response(
+                {'error': 'Сессия не найдена'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Проверяем статус из БД (обновляется фоновым потоком)
+        if session.status == 'signed':
+            # Ищем пользователя по ИИН
+            user = None
+            if session.iin:
+                from account.models import User
+                user = User.objects.filter(iin=session.iin).first()
+
+            if user:
+                from rest_framework_simplejwt.tokens import RefreshToken
+                refresh = RefreshToken.for_user(user)
+
+                session.user = user
+                session.status = 'completed'
+                session.save()
+
+                return Response({
+                    'status': 'completed',
+                    'user_exists': True,
+                    'access': str(refresh.access_token),
+                    'refresh': str(refresh),
+                })
+            else:
+                return Response({
+                    'status': 'signed',
+                    'user_exists': False,
+                    'registration_data': {
+                        'iin': session.iin,
+                        'first_name': session.first_name,
+                        'last_name': session.last_name,
+                        'middle_name': session.middle_name,
+                    }
+                })
+
+        elif session.status == 'error':
+            return Response({
+                'status': 'error',
+                'error': 'Ошибка подписания'
+            })
+
+        elif session.status == 'expired':
+            return Response({
+                'status': 'expired',
+                'error': 'Сессия истекла'
+            })
+
+        else:
+            return Response({
+                'status': 'pending'
+            })
+
+@extend_schema(
+    tags=['eGov Auth'],
+    summary='Завершение регистрации после eGov',
+    description='Создаёт пользователя с данными из eGov и отправляет email для подтверждения',
+    request=EgovRegistrationSerializer,
+)
+class EgovCompleteRegistrationView(APIView):
+    """Завершение регистрации после eGov авторизации"""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        registration_token = request.data.get('registration_token')
+        email = request.data.get('email', '').lower().strip()
+        phone = request.data.get('phone')
+
+        if not registration_token:
+            return Response(
+                {'error': 'registration_token обязателен'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not email:
+            return Response(
+                {'error': 'Email обязателен'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Ищем сессию
+        try:
+            session = EgovAuthSession.objects.get(qr_id=registration_token, status='signed')
+        except EgovAuthSession.DoesNotExist:
+            return Response(
+                {'error': 'Сессия не найдена или уже использована'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Проверяем истечение
+        if session.is_expired():
+            session.status = 'expired'
+            session.save()
+            return Response(
+                {'error': 'Сессия истекла'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Проверяем email
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {'error': 'Пользователь с таким email уже существует'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Проверяем ИИН (на случай если кто-то успел зарегистрироваться)
+        if User.objects.filter(iin=session.iin).exists():
+            return Response(
+                {'error': 'Пользователь с таким ИИН уже зарегистрирован'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Обрабатываем телефон
+        clean_phone = None
+        if phone:
+            phone = phone.strip()
+            if phone and phone != '+7':
+                import re
+                clean_phone = re.sub(r'[^\d+]', '', phone)
+                if clean_phone and User.objects.filter(phone=clean_phone).exists():
+                    return Response(
+                        {'error': 'Пользователь с таким телефоном уже зарегистрирован'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+        # Создаём пользователя БЕЗ пароля, неактивного
+        user = User.objects.create(
+            email=email,
+            iin=session.iin,
+            first_name=session.first_name or '',
+            last_name=session.last_name or '',
+            middle_name=session.middle_name or '',
+            phone=clean_phone,
+            is_active=False,
+            is_verified=False
+        )
+
+        # Создаём токен для подтверждения email и установки пароля
+        token = EmailVerificationToken.objects.create(user=user)
+
+        # Отправляем email
+        EmailService.send_verification_email(user=user, token=token.token)
+
+        # Обновляем сессию
+        session.status = 'completed'
+        session.user = user
+        session.save()
+
+        return Response({
+            'message': 'Регистрация почти завершена. Проверьте email для установки пароля.',
+            'email': user.email
+        }, status=status.HTTP_201_CREATED)

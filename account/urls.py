@@ -7,7 +7,10 @@ from .views import (
     LoginView,
     PasswordResetRequestView,
     PasswordResetConfirmView,
-    UserProfileView
+    UserProfileView,
+    EgovInitView,
+    EgovCheckStatusView,
+    EgovCompleteRegistrationView,
 )
 
 app_name = 'account'
@@ -27,4 +30,9 @@ urlpatterns = [
 
     # Профиль пользователя
     path('profile/', UserProfileView.as_view(), name='profile'),
+
+    # eGov авторизация
+    path('egov/init/', EgovInitView.as_view(), name='egov-init'),
+    path('egov/check-status/', EgovCheckStatusView.as_view(), name='egov-check-status'),
+    path('egov/complete-registration/', EgovCompleteRegistrationView.as_view(), name='egov-complete-registration'),
 ]
