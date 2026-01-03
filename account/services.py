@@ -207,25 +207,36 @@ class SigexAuthService:
                 cert = certs[0]
                 subject = cert.subject
 
+                cn_value = None
+
                 for attr in subject:
                     oid = attr.oid.dotted_string
                     value = attr.value
 
-                    if oid == '2.5.4.5':  # serialNumber
+                    if oid == '2.5.4.5':  # serialNumber → IIN
                         iin = cls._extract_iin(value)
                         if iin:
                             result['iin'] = iin
-                    elif oid == '2.5.4.3':  # commonName
-                        names = cls._parse_cn(value)
-                        result.update(names)
-                    elif oid == '2.5.4.4':  # surname
+                    elif oid == '2.5.4.3':  # commonName → Фамилия + Имя
+                        cn_value = value
+                    elif oid == '2.5.4.4':  # surname → Фамилия
                         result['last_name'] = value
-                    elif oid == '2.5.4.42':  # givenName
-                        result['first_name'] = value
+                    elif oid == '2.5.4.42':  # givenName → Отчество (в KZ сертификатах)
+                        result['middle_name'] = value
+
+                # Имя берём из CN (второе слово)
+                if cn_value:
+                    parts = cn_value.strip().split()
+                    if len(parts) >= 2:
+                        result['first_name'] = parts[1]  # Второе слово = имя
+                    # Если фамилия не заполнена, берём из CN
+                    if not result['last_name'] and len(parts) >= 1:
+                        result['last_name'] = parts[0]
 
         except Exception as e:
             logger.error(f'Error parsing signature: {e}')
 
+        logger.info(f'PARSED RESULT: {result}')
         return result
 
     @classmethod

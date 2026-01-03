@@ -428,6 +428,7 @@ class EgovCheckStatusView(APIView):
                 return Response({
                     'status': 'signed',
                     'user_exists': False,
+                    'registration_token': str(session.id),
                     'registration_data': {
                         'iin': session.iin,
                         'first_name': session.first_name,
@@ -482,8 +483,8 @@ class EgovCompleteRegistrationView(APIView):
 
         # Ищем сессию
         try:
-            session = EgovAuthSession.objects.get(qr_id=registration_token, status='signed')
-        except EgovAuthSession.DoesNotExist:
+            session = EgovAuthSession.objects.get(id=registration_token, status='signed')
+        except (EgovAuthSession.DoesNotExist, ValueError):
             return Response(
                 {'error': 'Сессия не найдена или уже использована'},
                 status=status.HTTP_404_NOT_FOUND
