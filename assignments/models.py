@@ -170,31 +170,21 @@ class AssignmentSubmission(models.Model):
             try:
                 old_submission = AssignmentSubmission.objects.get(pk=self.pk)
                 if old_submission.status != 'passed' and self.status == 'passed':
-                    # Статус изменен на passed - завершаем урок
+                    # Статус изменен на passed — завершаем урок через mark_completed
                     super().save(*args, **kwargs)
 
                     from progress.models import LessonProgress
-                    from django.utils import timezone
 
-                    lesson_progress = LessonProgress.objects.update_or_create(
+                    lesson_progress, created = LessonProgress.objects.get_or_create(
                         user=self.user,
                         lesson=self.assignment.lesson,
-                        defaults={
-                            'is_completed': True,
-                            'completed_at': timezone.now(),
-                            'completion_data': {'assignment_score': self.score}
-                        }
-                    )[0]
+                        defaults={'is_completed': False}
+                    )
 
-                    # ДОБАВЬТЕ ЭТО: Пересчитываем доступность следующего урока
-                    next_lesson = self.assignment.lesson.get_next_lesson()
-                    if next_lesson:
-                        next_lesson_progress, created = LessonProgress.objects.get_or_create(
-                            user=self.user,
-                            lesson=next_lesson
+                    if not lesson_progress.is_completed:
+                        lesson_progress.mark_completed(
+                            completion_data={'assignment_score': self.score}
                         )
-                        next_lesson_progress.calculate_available_at()
-
                     return
             except AssignmentSubmission.DoesNotExist:
                 pass
@@ -231,7 +221,6 @@ class AssignmentSubmission(models.Model):
         self.reviewed_at = timezone.now()
         self.save()
 
-
     def mark_passed(self, instructor, score, feedback=''):
         """Зачесть"""
         self.status = 'passed'
@@ -242,26 +231,19 @@ class AssignmentSubmission(models.Model):
         self.save()
 
         # Обновить прогресс урока
-        from progress.models import LessonProgress
-        lesson_progress = LessonProgress.objects.update_or_create(
+        from progress.models import LessonProgress, CourseEnrollment
+
+        lesson_progress, created = LessonProgress.objects.get_or_create(
             user=self.user,
             lesson=self.assignment.lesson,
-            defaults={
-                'is_completed': True,
-                'completed_at': timezone.now(),
-                'completion_data': {'assignment_score': score}
-            }
-        )[0]
+            defaults={'is_completed': False}
+        )
 
-        # Пересчитываем доступность следующего урока
-        next_lesson = self.assignment.lesson.get_next_lesson()
-        if next_lesson:
-            next_lesson_progress, created = LessonProgress.objects.get_or_create(
-                user=self.user,
-                lesson=next_lesson
-            )
-            next_lesson_progress.calculate_available_at()
+        # Вызываем mark_completed — он пересчитает прогресс курса и создаст выпускника
+        if not lesson_progress.is_completed:
+            lesson_progress.mark_completed(completion_data={'assignment_score': score})
 
+        # Уведомление
         from notifications.services import NotificationService
         NotificationService.notify_homework_accepted(
             user=self.user,
