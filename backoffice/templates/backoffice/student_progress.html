@@ -41,7 +41,12 @@
             </div>
             <div>
                 <dt class="text-sm font-medium text-gray-500">Прогресс</dt>
-                <dd class="mt-1 text-sm text-gray-900">{{ enrollment.progress }}%</dd>
+                <dd class="mt-1 text-sm text-gray-900">
+                    <span class="font-semibold text-indigo-600">{{ enrollment.completed_lessons_count }}</span>
+                    из
+                    <span class="font-semibold">{{ total_lessons }}</span>
+                    уроков
+                </dd>
             </div>
         </dl>
     </div>

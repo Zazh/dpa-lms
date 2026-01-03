@@ -198,12 +198,20 @@ def student_progress(request, user_id, group_id):
         'lesson__order'
     )
 
+    # Подсчёт уроков
+    from content.models import Lesson
+    total_lessons = Lesson.objects.filter(
+        module__course=group.course
+    ).count()
+
     context = {
         'student': student,
         'group': group,
         'membership': membership,
         'enrollment': enrollment,
         'lessons_progress': lessons_progress,
+        'total_lessons': total_lessons,
+
     }
 
     return render(request, 'backoffice/student_progress.html', context)
