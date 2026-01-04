@@ -7,6 +7,9 @@ from assignments.models import AssignmentSubmission
 from progress.models import CourseEnrollment
 from graduates.models import Graduate
 
+from django.contrib.auth import authenticate, login, logout
+
+
 
 @backoffice_required
 def dashboard(request):
@@ -669,3 +672,40 @@ def instructor_dossier_detail(request, dossier_id):
     }
 
     return render(request, 'backoffice/instructor_dossier_detail.html', context)
+
+
+def backoffice_login(request):
+    """Страница входа в backoffice"""
+
+    # Если уже залогинен — редирект
+    if request.user.is_authenticated:
+        if request.user.is_backoffice_user():
+            return redirect('backoffice:dashboard')
+        else:
+            messages.error(request, 'У вас нет доступа к backoffice')
+            return redirect('backoffice:login')
+
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+
+        user = authenticate(request, username=username, password=password)
+
+        if user is not None:
+            if user.is_backoffice_user():
+                login(request, user)
+                next_url = request.GET.get('next', 'backoffice:dashboard')
+                return redirect(next_url)
+            else:
+                messages.error(request, 'У вас нет доступа к backoffice. Только для сотрудников.')
+        else:
+            messages.error(request, 'Неверный email или пароль')
+
+    return render(request, 'backoffice/login.html')
+
+
+def backoffice_logout(request):
+    """Выход из backoffice"""
+    logout(request)
+    messages.success(request, 'Вы успешно вышли из системы')
+    return redirect('backoffice:login')

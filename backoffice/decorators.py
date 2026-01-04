@@ -11,7 +11,7 @@ def backoffice_required(view_func):
     """
 
     @wraps(view_func)
-    @login_required(login_url='/admin/login/')  # Используем стандартный логин Django
+    @login_required(login_url='backoffice:login')
     def wrapper(request, *args, **kwargs):
         if not request.user.is_backoffice_user():
             messages.error(request, 'Доступ запрещен. Только для сотрудников.')
@@ -28,7 +28,7 @@ def instructor_required(view_func):
     """
 
     @wraps(view_func)
-    @login_required(login_url='/admin/login/')
+    @login_required(login_url='backoffice:login')
     def wrapper(request, *args, **kwargs):
         if not request.user.is_instructor():
             messages.error(request, 'Доступ запрещен. Только для инструкторов.')

@@ -7,6 +7,10 @@ urlpatterns = [
     # Главная
     path('', views.dashboard, name='dashboard'),
 
+    # Авторизация
+    path('login/', views.backoffice_login, name='login'),
+    path('logout/', views.backoffice_logout, name='logout'),
+
     # Группы
     path('groups/', views.groups_list, name='groups_list'),
     path('groups/<int:group_id>/', views.group_detail, name='group_detail'),
