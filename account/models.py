@@ -138,14 +138,26 @@ class User(AbstractBaseUser, PermissionsMixin):
         """
         Получить группы, к которым у пользователя есть доступ
         - Супер-инструктор: все активные группы
-        - Инструктор: только назначенные группы
+        - Инструктор: группы из GroupInstructor + assigned_groups
         """
-        from groups.models import Group
+        from groups.models import Group, GroupInstructor
 
         if self.is_super_instructor():
             return Group.objects.filter(is_active=True)
         elif self.is_instructor():
-            return self.assigned_groups.filter(is_active=True)
+            # Группы через GroupInstructor (назначенные в админке)
+            instructor_group_ids = GroupInstructor.objects.filter(
+                instructor=self,
+                is_active=True
+            ).values_list('group_id', flat=True)
+
+            # Группы через assigned_groups (старый механизм, на всякий случай)
+            assigned_group_ids = self.assigned_groups.filter(is_active=True).values_list('id', flat=True)
+
+            # Объединяем
+            all_group_ids = set(instructor_group_ids) | set(assigned_group_ids)
+
+            return Group.objects.filter(id__in=all_group_ids, is_active=True)
         else:
             return Group.objects.none()
 

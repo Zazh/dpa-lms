@@ -39,6 +39,19 @@ class DossierService:
                 instructor_name = instructor.get_full_name()
                 instructor_email = instructor.email
 
+        # Если инструктор группы не найден — берём того, кто проверял ДЗ
+        if not instructor_name:
+            from assignments.models import AssignmentSubmission
+            last_reviewed = AssignmentSubmission.objects.filter(
+                user=user,
+                assignment__lesson__module__course=course,
+                reviewed_by__isnull=False
+            ).select_related('reviewed_by').order_by('-reviewed_at').first()
+
+            if last_reviewed and last_reviewed.reviewed_by:
+                instructor_name = last_reviewed.reviewed_by.get_full_name()
+                instructor_email = last_reviewed.reviewed_by.email
+
         # Получаем enrollment для даты зачисления
         from progress.models import CourseEnrollment
         try:
@@ -107,10 +120,22 @@ class DossierService:
     @classmethod
     def _get_group_instructor(cls, group):
         """Получить инструктора группы"""
-        # Проверяем assigned_instructors
+        from groups.models import GroupInstructor
+
+        # 1. Проверяем GroupInstructor (назначенные через админку)
+        group_instructor = GroupInstructor.objects.filter(
+            group=group,
+            is_active=True
+        ).select_related('instructor').first()
+
+        if group_instructor:
+            return group_instructor.instructor
+
+        # 2. Проверяем assigned_instructors (старый механизм)
         instructor = group.assigned_instructors.first()
         if instructor:
             return instructor
+
         return None
 
     @classmethod
