@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'notifications',
     'backoffice',
     'dossier',
+    'payments',
 
 ]
 
@@ -74,6 +75,12 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
 }
+
+# Kaspi настройки (заглушка)
+KASPI_MODE = 'stub'  # 'stub' для разработки, 'production' для боевого
+# KASPI_API_URL = ''
+# KASPI_MERCHANT_ID = ''
+# KASPI_API_KEY = ''
 
 # DRF Spectacular Settings
 SPECTACULAR_SETTINGS = {

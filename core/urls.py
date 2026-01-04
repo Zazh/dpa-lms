@@ -24,6 +24,9 @@ urlpatterns = [
 
     path('backoffice/', include('backoffice.urls')),
 
+    # Kaspi
+    path('api/', include('payments.urls')),
+
 ]
 
 # Для разработки - отдача медиа и статических файлов
