@@ -341,10 +341,6 @@ def payment_page_data_api(request, token):
 def simulate_payment_api(request, token):
     """
     Симулировать успешную оплату (только для разработки).
-    
-    POST /api/payments/orders/{token}/simulate-payment/
-    
-    ⚠️ УДАЛИТЬ В PRODUCTION!
     """
     if not settings.DEBUG:
         return Response(
@@ -372,6 +368,9 @@ def simulate_payment_api(request, token):
 
     # Обновляем заказ
     order.mark_as_paid(order.kaspi_payment_id)
+
+    # 🆕 Отправляем email со ссылкой на регистрацию
+    PaymentEmailService.send_payment_success(order)
 
     return Response({
         'success': True,

@@ -461,3 +461,46 @@ class EmailService:
 
         email_log.save()
         return email_log
+
+
+    @classmethod
+    def send_template_email(cls, to_email: str, subject: str, template: str, context: dict) -> Optional[EmailLog]:
+        """
+        Отправить email по шаблону.
+        Используется для платежных уведомлений.
+        """
+        from django.template.loader import render_to_string
+
+        try:
+            # Рендерим HTML из шаблона
+            html_content = render_to_string(template, context)
+
+            email_log = EmailLog.objects.create(
+                user=None,  # может не быть пользователя
+                recipient=to_email,
+                email_type='payment',
+                subject=subject,
+                status='pending'
+            )
+
+            sendpulse = SendPulseService()
+            result = sendpulse.send_email(
+                to_email=to_email,
+                subject=subject,
+                html_content=html_content
+            )
+
+            if result['success']:
+                email_log.status = 'sent'
+                email_log.sent_at = timezone.now()
+                email_log.sendpulse_response = result.get('response')
+            else:
+                email_log.status = 'failed'
+                email_log.error_message = result['message']
+
+            email_log.save()
+            return email_log
+
+        except Exception as e:
+            logger.error(f"Error sending template email to {to_email}: {e}")
+            return None

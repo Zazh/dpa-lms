@@ -228,5 +228,5 @@ class PaymentEmailService:
     @classmethod
     def _get_registration_url(cls, order):
         """Получить URL для завершения регистрации"""
-        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
-        return f"{frontend_url}/auth?order_token={order.token}"
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        return f"{frontend_url}/?order_token={order.token}"
