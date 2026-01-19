@@ -13,7 +13,8 @@ from .serializers import (
     QuizSubmitSerializer,
     QuizResultSerializer,
     QuizQuestionWithCorrectSerializer,
-    QuizAttemptSerializer, QuizAnswerSerializer
+    QuizAttemptSerializer,
+    QuizAnswerWithCorrectSerializer
 )
 from progress.models import LessonProgress
 
@@ -283,7 +284,7 @@ def submit_quiz(request, attempt_id):
                             if answer_id in answers_dict:
                                 ordered_answers.append(answers_dict[answer_id])
 
-                        question_data['answers'] = QuizAnswerSerializer(ordered_answers, many=True).data
+                        question_data['answers'] = QuizAnswerWithCorrectSerializer(ordered_answers, many=True).data
 
                     question_data['user_selected_ids'] = list(
                         response.selected_answers.values_list('id', flat=True)
@@ -376,7 +377,7 @@ def quiz_attempt_detail(request, attempt_id):
                     if answer_id in answers_dict:
                         ordered_answers.append(answers_dict[answer_id])
 
-                question_data['answers'] = QuizAnswerSerializer(ordered_answers, many=True).data
+                question_data['answers'] = QuizAnswerWithCorrectSerializer(ordered_answers, many=True).data
 
             question_data['user_selected_ids'] = list(
                 response.selected_answers.values_list('id', flat=True)
