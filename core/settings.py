@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'backoffice',
     'dossier',
     'payments',
+    'exports',
 
 ]
 
