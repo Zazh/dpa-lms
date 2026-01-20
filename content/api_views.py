@@ -17,15 +17,36 @@ from progress.models import CourseEnrollment, LessonProgress, VideoProgress
 class CourseListView(APIView):
     """
     GET /api/courses/
-    Каталог курсов (вкладка "Все курсы")
+    Каталог курсов (вкладка "Все курсы") - ОПТИМИЗИРОВАНО
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        courses = Course.objects.filter(is_active=True).order_by('-created_at')
-        serializer = CourseListSerializer(courses, many=True, context={'request': request})
-        return Response(serializer.data)
+        from django.db.models import Count, Exists, OuterRef
+        from progress.models import CourseEnrollment
 
+        # Подзапрос для проверки зачисления
+        enrollment_subquery = CourseEnrollment.objects.filter(
+            user=request.user,
+            course=OuterRef('pk'),
+            is_active=True
+        )
+
+        # Один запрос с аннотациями
+        courses = Course.objects.filter(
+            is_active=True
+        ).annotate(
+            modules_count_annotated=Count('modules', distinct=True),
+            lessons_count_annotated=Count('modules__lessons', distinct=True),
+            is_enrolled_annotated=Exists(enrollment_subquery)
+        ).order_by('-created_at')
+
+        serializer = CourseListSerializer(
+            courses,
+            many=True,
+            context={'request': request}
+        )
+        return Response(serializer.data)
 
 class CourseDetailView(APIView):
     """
@@ -158,11 +179,25 @@ class LessonDetailView(APIView):
         }
 
     def _get_quiz_lesson_data(self, lesson, user):
-        """Данные для теста"""
-        from quizzes.models import QuizLesson
+        """Данные для теста - ОПТИМИЗИРОВАНО"""
+        from quizzes.models import QuizLesson, QuizAttempt
         from quizzes.serializers import QuizLessonDetailSerializer
+        from django.db.models import Prefetch
 
-        quiz_lesson = get_object_or_404(QuizLesson, lesson=lesson)
+        # Один запрос с prefetch вопросов и ответов
+        quiz_lesson = QuizLesson.objects.select_related(
+            'lesson'
+        ).prefetch_related(
+            Prefetch(
+                'questions',
+                queryset=QuizLesson.questions.rel.related_model.objects.prefetch_related('answers').order_by('order')
+            ),
+            Prefetch(
+                'attempts',
+                queryset=QuizAttempt.objects.filter(user=user).order_by('-started_at'),
+                to_attr='user_attempts'
+            )
+        ).get(lesson=lesson)
 
         # Получаем прогресс урока
         lesson_progress = LessonProgress.objects.get(user=user, lesson=lesson)
@@ -170,10 +205,11 @@ class LessonDetailView(APIView):
         return {
             'quiz': QuizLessonDetailSerializer(
                 quiz_lesson,
-                context={'request': self.request}
+                context={'request': self.request, 'user': user}
             ).data,
             'progress': {
-                'is_completed': lesson_progress.is_completed
+                'is_completed': lesson_progress.is_completed,
+                'completion_data': lesson_progress.completion_data
             }
         }
 

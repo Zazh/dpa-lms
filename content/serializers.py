@@ -15,7 +15,7 @@ class LessonMaterialSerializer(serializers.ModelSerializer):
 
 
 class CourseListSerializer(serializers.ModelSerializer):
-    """Курс в каталоге (список)"""
+    """Курс в каталоге (список) - ОПТИМИЗИРОВАНО"""
     modules_count = serializers.SerializerMethodField()
     lessons_count = serializers.SerializerMethodField()
     is_enrolled = serializers.SerializerMethodField()
@@ -25,12 +25,23 @@ class CourseListSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'label', 'description', 'duration', 'modules_count', 'lessons_count', 'is_enrolled']
 
     def get_modules_count(self, obj):
+        # Используем аннотацию если есть
+        if hasattr(obj, 'modules_count_annotated'):
+            return obj.modules_count_annotated
         return obj.get_modules_count()
 
     def get_lessons_count(self, obj):
+        # Используем аннотацию если есть
+        if hasattr(obj, 'lessons_count_annotated'):
+            return obj.lessons_count_annotated
         return obj.get_lessons_count()
 
     def get_is_enrolled(self, obj):
+        # Используем аннотацию если есть
+        if hasattr(obj, 'is_enrolled_annotated'):
+            return obj.is_enrolled_annotated
+
+        # Fallback
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return False
@@ -41,9 +52,6 @@ class CourseListSerializer(serializers.ModelSerializer):
             course=obj,
             is_active=True
         ).exists()
-
-
-
 
 
 class VideoLessonDetailSerializer(serializers.ModelSerializer):

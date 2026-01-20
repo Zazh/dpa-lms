@@ -3,24 +3,54 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+from django.db.models import Prefetch, Count, Q
 from .models import CourseEnrollment, LessonProgress, VideoProgress
 from .serializers import MyCourseSerializer, CourseProgressSerializer
 from content.models import Course, Lesson
+from groups.models import GroupMembership
 
 
 class MyCoursesView(APIView):
     """
     GET /api/courses/my/
-    Мои курсы (с прогрессом и доступом)
+    Мои курсы (с прогрессом и доступом) - ОПТИМИЗИРОВАНО
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Получаем все зачисления пользователя
+        # Получаем все зачисления с prefetch связанных данных
         enrollments = CourseEnrollment.objects.filter(
             user=request.user,
             is_active=True
-        ).select_related('course', 'group').order_by('-enrolled_at')
+        ).select_related(
+            'course',
+            'group'
+        ).annotate(
+            # Считаем total_lessons через аннотацию (1 запрос вместо N)
+            total_lessons_count=Count(
+                'course__modules__lessons',
+                distinct=True
+            )
+        ).order_by('-enrolled_at')
+
+        # Prefetch memberships для всех групп сразу
+        group_ids = [e.group_id for e in enrollments if e.group_id]
+        memberships_map = {}
+
+        if group_ids:
+            memberships = GroupMembership.objects.filter(
+                user=request.user,
+                group_id__in=group_ids,
+                is_active=True
+            )
+            memberships_map = {m.group_id: m for m in memberships}
+
+        # Привязываем membership к enrollment
+        for enrollment in enrollments:
+            if enrollment.group_id:
+                enrollment._prefetched_membership = memberships_map.get(enrollment.group_id)
+            else:
+                enrollment._prefetched_membership = None
 
         # Фильтруем только с активным доступом
         active_enrollments = [e for e in enrollments if e.has_access()]

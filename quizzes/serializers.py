@@ -69,11 +69,11 @@ class QuizQuestionWithCorrectSerializer(serializers.ModelSerializer):
 
 
 class QuizLessonDetailSerializer(serializers.ModelSerializer):
-    """Подробная информация о тесте"""
+    """Подробная информация о тесте - ОПТИМИЗИРОВАНО"""
 
     questions = serializers.SerializerMethodField()
-    questions_count = serializers.IntegerField(source='get_questions_count', read_only=True)
-    total_points = serializers.IntegerField(source='get_total_points', read_only=True)
+    questions_count = serializers.SerializerMethodField()
+    total_points = serializers.SerializerMethodField()
     can_attempt = serializers.SerializerMethodField()
     user_attempts_count = serializers.SerializerMethodField()
     best_score = serializers.SerializerMethodField()
@@ -96,14 +96,14 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_questions(self, obj):
-        """Получить вопросы с учетом перемешивания"""
+        """Получить вопросы с учетом перемешивания - ОПТИМИЗИРОВАНО"""
 
         # Проверяем есть ли предопределенный порядок из контекста
         questions = self.context.get('questions')
 
         if questions is None:
-            # Если порядка нет - берем из базы
-            questions = list(obj.questions.all().order_by('order'))
+            # Используем prefetch (без дополнительных запросов!)
+            questions = list(obj.questions.all())
 
             # Перемешиваем если нужно
             if obj.shuffle_questions:
@@ -112,43 +112,110 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
         # Сериализуем вопросы
         serialized_questions = []
         for question in questions:
-            # Получаем ответы
-            answers = list(question.answers.all().order_by('order'))
+            # Ответы уже загружены через prefetch!
+            answers = list(question.answers.all())
 
             # Перемешиваем ответы если нужно
             if obj.shuffle_answers:
                 random.shuffle(answers)
 
-            # Сохраняем порядок ответов для этого вопроса
+            # Сохраняем порядок ответов
             answers_order = [a.id for a in answers]
 
-            question_data = QuizQuestionSerializer(question).data
-            question_data['answers'] = QuizAnswerSerializer(answers, many=True).data
-            question_data['answers_order'] = answers_order  # ← ДОБАВЛЯЕМ ПОРЯДОК
+            question_data = {
+                'id': question.id,
+                'question_type': question.question_type,
+                'question_text': question.question_text,
+                'points': question.points,
+                'order': question.order,
+                'answers': QuizAnswerSerializer(answers, many=True).data,
+                'answers_order': answers_order
+            }
 
             serialized_questions.append(question_data)
 
         return serialized_questions
 
+    def get_questions_count(self, obj):
+        """Количество вопросов - из prefetch без запроса"""
+        return len(list(obj.questions.all()))
+
+    def get_total_points(self, obj):
+        """Сумма баллов - из prefetch без запроса"""
+        return sum(q.points for q in obj.questions.all())
+
     def get_can_attempt(self, obj):
         """Может ли пользователь пройти тест"""
-        user = self.context.get('request').user
+        request = self.context.get('request')
+        if not request:
+            return {'allowed': False, 'message': 'Не авторизован'}
+
+        user = request.user
+
+        # Используем prefetch если есть
+        user_attempts = getattr(obj, 'user_attempts_list', None)
+
+        if user_attempts is not None:
+            # Логика проверки из prefetch
+            attempts_count = len(user_attempts)
+
+            if obj.max_attempts and attempts_count >= obj.max_attempts:
+                return {'allowed': False, 'message': f'Достигнут лимит попыток ({obj.max_attempts})'}
+
+            # Проверка задержки между попытками
+            if obj.retry_delay_hours and user_attempts:
+                from django.utils import timezone
+                last_attempt = max(user_attempts, key=lambda a: a.started_at)
+                if last_attempt.status == 'completed':
+                    time_since = timezone.now() - last_attempt.completed_at
+                    hours_passed = time_since.total_seconds() / 3600
+                    if hours_passed < obj.retry_delay_hours:
+                        remaining = obj.retry_delay_hours - hours_passed
+                        return {
+                            'allowed': False,
+                            'message': f'Повторная попытка доступна через {int(remaining)} ч.'
+                        }
+
+            return {'allowed': True, 'message': 'Можно начать тест'}
+
+        # Fallback к стандартному методу
         can_attempt, message = obj.can_user_attempt(user)
-        return {
-            'allowed': can_attempt,
-            'message': message
-        }
+        return {'allowed': can_attempt, 'message': message}
 
     def get_user_attempts_count(self, obj):
-        """Количество попыток пользователя"""
-        user = self.context.get('request').user
-        return obj.attempts.filter(user=user).count()
+        """Количество попыток пользователя - из prefetch"""
+        user_attempts = getattr(obj, 'user_attempts_list', None)
+
+        if user_attempts is not None:
+            return len(user_attempts)
+
+        # Fallback
+        request = self.context.get('request')
+        if not request:
+            return 0
+        return obj.attempts.filter(user=request.user).count()
 
     def get_best_score(self, obj):
-        """Лучший результат пользователя"""
-        user = self.context.get('request').user
+        """Лучший результат пользователя - из prefetch"""
+        user_attempts = getattr(obj, 'user_attempts_list', None)
+
+        if user_attempts is not None:
+            completed = [a for a in user_attempts if a.status == 'completed']
+            if completed:
+                best = max(completed, key=lambda a: a.score_percentage)
+                return {
+                    'score': float(best.score_percentage),
+                    'passed': best.is_passed()
+                }
+            return None
+
+        # Fallback
+        request = self.context.get('request')
+        if not request:
+            return None
+
         best_attempt = obj.attempts.filter(
-            user=user,
+            user=request.user,
             status='completed'
         ).order_by('-score_percentage').first()
 

@@ -1,8 +1,8 @@
 from rest_framework import serializers
 from .models import CourseEnrollment, LessonProgress, VideoProgress
-from content.models import Lesson
-from content.serializers import LessonListSerializer
+from content.models import Lesson, Module, VideoLesson
 from django.utils import timezone
+from django.db.models import Prefetch, Count, Q
 
 
 class VideoProgressSerializer(serializers.ModelSerializer):
@@ -19,20 +19,74 @@ class LessonProgressSerializer(serializers.ModelSerializer):
     is_available = serializers.SerializerMethodField()
     available_at = serializers.DateTimeField(read_only=True)
     available_in = serializers.SerializerMethodField()
-    video_duration = serializers.SerializerMethodField()  # ← НОВОЕ
+    video_duration = serializers.SerializerMethodField()
 
     class Meta:
         model = LessonProgress
-        fields = ['id', 'lesson', 'is_completed', 'is_available', 'available_at', 'available_in',
-                  'started_at', 'completed_at', 'video_duration']
+        fields = [
+            'id', 'lesson', 'is_completed', 'is_available', 'available_at',
+            'available_in', 'started_at', 'completed_at', 'video_duration'
+        ]
 
     def get_lesson(self, obj):
-        """Получить данные урока с передачей context"""
-        from content.serializers import LessonListSerializer
-        return LessonListSerializer(
-            obj.lesson,
-            context=self.context
-        ).data
+        """Получить данные урока (без дополнительных запросов)"""
+        lesson = obj.lesson
+
+        # Базовые данные урока
+        data = {
+            'id': lesson.id,
+            'title': lesson.title,
+            'description': lesson.description,
+            'type': lesson.lesson_type,
+            'type_display': lesson.get_lesson_type_display(),
+            'order': lesson.order,
+            'videolesson': None
+        }
+
+        # Если это видео-урок, берём данные из prefetch (без запроса!)
+        if lesson.lesson_type == 'video':
+            # Проверяем prefetch cache
+            video_lessons = getattr(lesson, '_prefetched_video', None)
+            if video_lessons is None:
+                # Fallback: проверяем стандартный prefetch
+                if hasattr(lesson, 'videolesson'):
+                    try:
+                        video = lesson.videolesson
+                        data['videolesson'] = self._serialize_video(video)
+                    except VideoLesson.DoesNotExist:
+                        pass
+            elif video_lessons:
+                data['videolesson'] = self._serialize_video(video_lessons[0])
+
+        return data
+
+    def _serialize_video(self, video):
+        """Сериализация видео без дополнительных запросов"""
+        request = self.context.get('request')
+
+        thumbnail_url = None
+        if video.thumbnail:
+            if request:
+                thumbnail_url = request.build_absolute_uri(video.thumbnail.url)
+            else:
+                from django.conf import settings
+                thumbnail_url = f"{settings.MEDIA_URL}{video.thumbnail.name}"
+
+        # Форматируем длительность
+        duration = video.video_duration or 0
+        minutes = int(duration // 60)
+        seconds = int(duration % 60)
+        formatted = f"{minutes}:{seconds:02d}"
+
+        return {
+            'vimeo_video_id': video.vimeo_video_id,
+            'embed_url': video.get_vimeo_embed_url(),
+            'video_duration': video.video_duration,
+            'formatted_duration': formatted,
+            'completion_threshold': video.completion_threshold,
+            'thumbnail_url': thumbnail_url,
+            'timecodes': video.timecodes,
+        }
 
     def get_is_available(self, obj):
         return obj.is_available()
@@ -61,22 +115,22 @@ class LessonProgressSerializer(serializers.ModelSerializer):
             return f"через {minutes} мин."
 
     def get_video_duration(self, obj):
-        """Длительность видео в формате MM:SS"""
+        """Длительность видео (из prefetch, без запроса!)"""
         if obj.lesson.lesson_type != 'video':
             return None
 
-        try:
-            from content.models import VideoLesson
-            video = VideoLesson.objects.get(lesson=obj.lesson)
+        # Используем уже загруженные данные
+        if hasattr(obj.lesson, 'videolesson'):
+            try:
+                video = obj.lesson.videolesson
+                duration = video.video_duration or 0
+                minutes = int(duration // 60)
+                seconds = int(duration % 60)
+                return f"{minutes}:{seconds:02d}"
+            except VideoLesson.DoesNotExist:
+                pass
 
-            # Форматируем секунды в MM:SS
-            duration = video.video_duration
-            minutes = int(duration // 60)
-            seconds = int(duration % 60)
-
-            return f"{minutes}:{seconds:02d}"
-        except:
-            return None
+        return None
 
 
 class ModuleProgressSerializer(serializers.Serializer):
@@ -92,7 +146,7 @@ class ModuleProgressSerializer(serializers.Serializer):
 
 
 class CourseProgressSerializer(serializers.ModelSerializer):
-    """Прогресс по курсу"""
+    """Прогресс по курсу - ОПТИМИЗИРОВАННАЯ ВЕРСИЯ"""
     course = serializers.SerializerMethodField()
     current_lesson = serializers.SerializerMethodField()
     modules = serializers.SerializerMethodField()
@@ -110,7 +164,21 @@ class CourseProgressSerializer(serializers.ModelSerializer):
         }
 
     def get_current_lesson(self, obj):
-        """Текущий урок (первый незавершенный)"""
+        """Текущий урок (первый незавершенный) - из кэша"""
+        # Используем prefetch если есть
+        lessons_progress = getattr(obj, '_prefetched_lessons_progress', None)
+
+        if lessons_progress is not None:
+            for lp in lessons_progress:
+                if not lp.is_completed and lp.is_available():
+                    return {
+                        'id': lp.lesson.id,
+                        'title': lp.lesson.title,
+                        'type': lp.lesson.lesson_type
+                    }
+            return None
+
+        # Fallback к стандартному методу
         lesson = obj.get_current_lesson()
         if lesson:
             return {
@@ -121,20 +189,49 @@ class CourseProgressSerializer(serializers.ModelSerializer):
         return None
 
     def get_modules(self, obj):
-        """Модули с прогрессом уроков"""
-        from content.models import Module
+        """
+        Модули с прогрессом уроков - ОПТИМИЗИРОВАНО!
 
-        modules = Module.objects.filter(course=obj.course).prefetch_related('lessons').order_by('order')
+        Было: N+1 запросов (1 + количество модулей)
+        Стало: 2 запроса (модули + прогресс уроков)
+        """
+        # 1. Получаем все модули курса с prefetch уроков и видео
+        modules = Module.objects.filter(
+            course=obj.course
+        ).prefetch_related(
+            Prefetch(
+                'lessons',
+                queryset=Lesson.objects.select_related('videolesson').order_by('order')
+            )
+        ).order_by('order')
+
+        # 2. ОДИН запрос для всего прогресса пользователя по курсу
+        all_progress = LessonProgress.objects.filter(
+            user=obj.user,
+            lesson__module__course=obj.course
+        ).select_related(
+            'lesson',
+            'lesson__videolesson'
+        ).order_by('lesson__module__order', 'lesson__order')
+
+        # 3. Группируем прогресс по module_id для быстрого доступа
+        progress_by_module = {}
+        for lp in all_progress:
+            module_id = lp.lesson.module_id
+            if module_id not in progress_by_module:
+                progress_by_module[module_id] = []
+            progress_by_module[module_id].append(lp)
+
+        # Сохраняем для get_current_lesson
+        obj._prefetched_lessons_progress = list(all_progress)
+
+        # 4. Собираем результат
         result = []
-
         for module in modules:
-            lessons_progress = LessonProgress.objects.filter(
-                user=obj.user,
-                lesson__module=module
-            ).select_related('lesson').order_by('lesson__order')
+            lessons_progress = progress_by_module.get(module.id, [])
 
-            total_lessons = lessons_progress.count()
-            completed_lessons = lessons_progress.filter(is_completed=True).count()
+            total_lessons = len(lessons_progress)
+            completed_lessons = sum(1 for lp in lessons_progress if lp.is_completed)
             progress_percentage = (completed_lessons / total_lessons * 100) if total_lessons > 0 else 0
 
             result.append({
@@ -142,11 +239,10 @@ class CourseProgressSerializer(serializers.ModelSerializer):
                 'title': module.title,
                 'description': module.description,
                 'order': module.order,
-                # ✅ ИСПРАВИТЬ:
                 'lessons': LessonProgressSerializer(
                     lessons_progress,
                     many=True,
-                    context=self.context  # ← ДОБАВИТЬ!
+                    context=self.context
                 ).data,
                 'completed_lessons': completed_lessons,
                 'total_lessons': total_lessons,
@@ -175,7 +271,10 @@ class MyCourseSerializer(serializers.Serializer):
         }
 
     def get_total_lessons(self, obj):
-        from content.models import Lesson
+        # Используем аннотацию если есть
+        if hasattr(obj, 'total_lessons_count'):
+            return obj.total_lessons_count
+
         return Lesson.objects.filter(module__course=obj.course).count()
 
     def get_current_lesson(self, obj):
@@ -192,13 +291,16 @@ class MyCourseSerializer(serializers.Serializer):
         if not obj.group:
             return None
 
-        from groups.models import GroupMembership
+        # Используем prefetch если есть
+        membership = getattr(obj, '_prefetched_membership', None)
 
-        membership = GroupMembership.objects.filter(
-            user=obj.user,
-            group=obj.group,
-            is_active=True
-        ).first()
+        if membership is None:
+            from groups.models import GroupMembership
+            membership = GroupMembership.objects.filter(
+                user=obj.user,
+                group=obj.group,
+                is_active=True
+            ).first()
 
         days_left = None
         if membership and membership.personal_deadline_at:
