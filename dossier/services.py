@@ -92,9 +92,8 @@ class DossierService:
             instructor_name=instructor_name,
             instructor_email=instructor_email,
 
-            # Сертификат
-            certificate_number=graduate.certificate_number,
-            certificate_file=graduate.certificate_file,
+            # Сертификат (берём из Certificate)
+            certificate_number=graduate.certificate.number if hasattr(graduate, 'certificate') and graduate.certificate else '',
 
             # Даты
             enrolled_at=enrolled_at,

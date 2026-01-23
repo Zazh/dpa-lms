@@ -42,6 +42,11 @@
             {% endif %}
         </div>
 
+        {% if with_stamp %}
+            <!-- Печать и подпись -->
+            <div class="stamp">Подпись</div>
+        {% endif %}
+
         <div class="certificate-number">№ {{ certificate_number }}</div>
     </div>
 </body>

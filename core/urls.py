@@ -30,6 +30,9 @@ urlpatterns = [
     # Exports PDF
     path('api/exports/', include('exports.urls')),
 
+    path('api/certificates/', include('certificates.urls')),
+
+
 
 ]
 

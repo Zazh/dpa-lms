@@ -294,15 +294,18 @@
                         <p class="text-sm text-gray-500">Дата выпуска</p>
                         <p class="text-sm text-gray-900">{{ dossier.graduated_at|date:"d.m.Y H:i" }}</p>
                     </div>
-                    
-                    {% if dossier.certificate_file %}
-                    <a href="{{ dossier.certificate_file.url }}" target="_blank" 
-                       class="block w-full text-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-                        📥 Скачать сертификат
-                    </a>
-                    {% else %}
-                    <p class="text-sm text-gray-500">Файл не загружен</p>
-                    {% endif %}
+
+                    <div class="flex flex-wrap gap-3">
+                        <a href="{% url 'backoffice:export_dossier_certificate_no_stamp' dossier.id %}"
+                           class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                            📄 Скачать без печати
+                        </a>
+
+                        <a href="{% url 'backoffice:export_dossier_certificate_with_stamp' dossier.id %}"
+                           class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                            🎓 Скачать с печатью
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -332,19 +335,15 @@
             </div>
         </div>
 
-    <!-- Действия с досье -->
-<div class="bg-white shadow rounded-lg mb-6">
-    <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-base font-medium text-gray-900 mb-4">Действия</h3>
+        <!-- Действия с досье -->
+        <div class="bg-white shadow rounded-lg mb-6">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-base font-medium text-gray-900 mb-4">Действия</h3>
 
-        <div class="flex flex-wrap gap-3">
-            <a href="{% url 'backoffice:export_dossier_certificate_pdf' dossier.id %}"
-               class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-                🎓 Скачать сертификат PDF
-            </a>
+
+
+            </div>
         </div>
-    </div>
-</div>
         
         <!-- Мета-информация -->
         <div class="bg-white shadow rounded-lg">

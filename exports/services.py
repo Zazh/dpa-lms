@@ -171,23 +171,24 @@ class CertificatePDFService:
     def __init__(self):
         self.generator = PDFGenerator()
 
-    def generate(self, graduate) -> bytes:
+    def generate(self, graduate, with_stamp: bool = False) -> bytes:
         """
-        Генерирует PDF сертификат
+        Генерирует PDF сертификат из Graduate
 
         Args:
             graduate: Graduate instance
+            with_stamp: добавить печать
 
         Returns:
             bytes: PDF документ
         """
         context = {
-            'graduate': graduate,
             'student_name': graduate.user.get_full_name(),
             'course_title': graduate.course.title,
             'certificate_number': graduate.certificate_number,
             'completed_at': graduate.completed_at,
             'group_name': graduate.group.name if graduate.group else '',
+            'with_stamp': with_stamp,
         }
 
         return self.generator.generate_from_template(
@@ -196,12 +197,39 @@ class CertificatePDFService:
             css_files=self.CSS_FILES
         )
 
-    def generate_from_dossier(self, dossier) -> bytes:
+    def generate_from_certificate(self, certificate, with_stamp: bool = False) -> bytes:
+        """
+        Генерирует PDF из модели Certificate
+
+        Args:
+            certificate: Certificate instance
+            with_stamp: добавить печать
+
+        Returns:
+            bytes: PDF документ
+        """
+        context = {
+            'student_name': certificate.holder_name,
+            'course_title': certificate.course_title,
+            'certificate_number': certificate.number,
+            'completed_at': certificate.issued_at,
+            'group_name': certificate.group_name,
+            'with_stamp': with_stamp,
+        }
+
+        return self.generator.generate_from_template(
+            'exports/certificate.html',
+            context,
+            css_files=self.CSS_FILES
+        )
+
+    def generate_from_dossier(self, dossier, with_stamp: bool = False) -> bytes:
         """
         Генерирует PDF сертификат из данных досье
 
         Args:
             dossier: StudentDossier instance
+            with_stamp: добавить печать
 
         Returns:
             bytes: PDF документ
@@ -212,6 +240,7 @@ class CertificatePDFService:
             'certificate_number': dossier.certificate_number,
             'completed_at': dossier.completed_at,
             'group_name': dossier.group_name,
+            'with_stamp': with_stamp,
             'from_dossier': True,
         }
 

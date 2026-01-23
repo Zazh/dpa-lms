@@ -238,43 +238,38 @@ class Graduate(models.Model):
 
         return details
 
-    def generate_certificate_number(self):
-        """Генерация уникального номера сертификата"""
-        if not self.certificate_number:
-            import uuid
-            year = self.completed_at.year
-            unique_id = str(uuid.uuid4())[:8].upper()
-            self.certificate_number = f"KZ-{year}-{unique_id}"
-            self.save(update_fields=['certificate_number'])
-        return self.certificate_number
-
     def approve_graduation(self, manager):
         """Подтвердить выпуск (вызывается менеджером)"""
-        if self.status == 'pending':
+        from django.db import transaction
+
+        if self.status != 'pending':
+            return False
+
+        # Всё в одной транзакции — или всё сохранится, или ничего
+        with transaction.atomic():
             self.status = 'graduated'
             self.graduated_at = timezone.now()
             self.graduated_by = manager
-
-            # Генерируем номер сертификата если нет
-            if not self.certificate_number:
-                self.generate_certificate_number()
-
-            # Устанавливаем дату выдачи сертификата
-            if not self.certificate_issued_at:
-                self.certificate_issued_at = timezone.now()
-
             self.save()
 
-            # Отправить уведомление студенту
-            from notifications.services import NotificationService
-            NotificationService.notify_graduation(self.user, self)
+            # Создаём сертификат
+            from certificates.services import CertificateService
+            certificate = CertificateService.create_from_graduate(self)
+            self.certificate = certificate
 
-            # Создать досье студента
+            # Создаём досье
             from dossier.services import DossierService
             DossierService.create_student_dossier(self)
 
-            return True
-        return False
+        # После успешной транзакции — фоновые задачи
+        from certificates.tasks import generate_certificate_pdf
+        generate_certificate_pdf.delay(certificate.id)
+
+        # Уведомление студенту
+        from notifications.services import NotificationService
+        NotificationService.notify_graduation(self.user, self)
+
+        return True
 
     def reject_graduation(self, manager, reason=''):
         """Отклонить выпуск"""

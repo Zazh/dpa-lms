@@ -428,7 +428,7 @@ def graduates_list(request):
 
 @backoffice_required
 def graduate_detail(request, graduate_id):
-    """Детали выпускника + загрузка сертификата"""
+    """Детали выпускника"""
 
     graduate = get_object_or_404(Graduate, id=graduate_id)
 
@@ -443,29 +443,13 @@ def graduate_detail(request, graduate_id):
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        # Загрузить сертификат
-        if action == 'upload_certificate':
-            certificate_file = request.FILES.get('certificate_file')
-
-            if not certificate_file:
-                messages.error(request, 'Выберите файл сертификата')
-            elif not certificate_file.name.endswith('.pdf'):
-                messages.error(request, 'Файл должен быть в формате PDF')
-            else:
-                graduate.certificate_file = certificate_file
-                graduate.save()
-                messages.success(request, 'Сертификат загружен!')
-                return redirect('backoffice:graduate_detail', graduate_id=graduate_id)
-
         # Выпустить студента
-        elif action == 'approve':
-            if not graduate.certificate_file:
-                messages.error(request, 'Сначала загрузите сертификат')
-            elif graduate.status != 'pending':
+        if action == 'approve':
+            if graduate.status != 'pending':
                 messages.error(request, 'Можно выпустить только студента со статусом "Ожидает выпуска"')
             else:
                 graduate.approve_graduation(request.user)
-                messages.success(request, f'🎓 Студент {graduate.user.get_full_name()} выпущен!')
+                messages.success(request, f'🎓 Студент {graduate.user.get_full_name()} выпущен! Сертификат генерируется...')
                 return redirect('backoffice:graduates_list')
 
         # Отклонить
@@ -487,7 +471,6 @@ def graduate_detail(request, graduate_id):
     }
 
     return render(request, 'backoffice/graduate_detail.html', context)
-
 
 @backoffice_required
 def graduates_bulk_action(request):
@@ -514,20 +497,15 @@ def graduates_bulk_action(request):
     if action == 'approve':
         # Массовый выпуск
         count = 0
-        errors = []
 
         for graduate in graduates.filter(status='pending'):
-            if graduate.certificate_file:
-                graduate.approve_graduation(request.user)
-                count += 1
-            else:
-                errors.append(f'{graduate.user.get_full_name()} - нет сертификата')
+            graduate.approve_graduation(request.user)
+            count += 1
 
-        if count > 0:
-            messages.success(request, f'🎓 Выпущено студентов: {count}')
-
-        if errors:
-            messages.warning(request, f'Пропущено (нет сертификата): {len(errors)}')
+        if count:
+            messages.success(request, f'🎓 Выпущено студентов: {count}. Сертификаты генерируются в фоне...')
+        else:
+            messages.warning(request, 'Нет студентов для выпуска')
 
     elif action == 'reject':
         # Массовое отклонение
@@ -746,11 +724,10 @@ def export_dossier_quiz_pdf(request, dossier_id, quiz_index):
 
 
 @backoffice_required
-def export_dossier_certificate_pdf(request, dossier_id):
-    """Экспорт сертификата из досье в PDF"""
+def export_dossier_certificate_pdf(request, dossier_id, with_stamp=False):
+    """Скачать сертификат из досье"""
 
     from dossier.models import StudentDossier
-    from exports.services import CertificatePDFService
 
     user = request.user
 
@@ -761,24 +738,50 @@ def export_dossier_certificate_pdf(request, dossier_id):
 
     dossier = get_object_or_404(StudentDossier, id=dossier_id)
 
-    # Генерация PDF
-    service = CertificatePDFService()
-
-    try:
-        pdf_content = service.generate_from_dossier(dossier)
-    except Exception as e:
-        messages.error(request, f'Ошибка генерации сертификата: {str(e)}')
+    # Получаем сертификат через graduate
+    if not dossier.graduate or not hasattr(dossier.graduate, 'certificate'):
+        messages.error(request, 'Сертификат не найден')
         return redirect('backoffice:student_dossier_detail', dossier_id=dossier_id)
 
-    # Имя файла
-    student_name = dossier.get_full_name().replace(' ', '_')
-    filename = f"certificate_{student_name}_{dossier.certificate_number}.pdf"
+    certificate = dossier.graduate.certificate
 
-    from django.http import HttpResponse
-    response = HttpResponse(pdf_content, content_type='application/pdf')
+    if certificate.status != 'ready':
+        messages.warning(request, 'Сертификат ещё генерируется, попробуйте позже')
+        return redirect('backoffice:student_dossier_detail', dossier_id=dossier_id)
+
+    # Выбираем файл
+    if with_stamp:
+        file_field = certificate.file_with_stamp
+        suffix = 'с_печатью'
+    else:
+        file_field = certificate.file_without_stamp
+        suffix = 'без_печати'
+
+    if not file_field:
+        messages.error(request, 'Файл сертификата не найден')
+        return redirect('backoffice:student_dossier_detail', dossier_id=dossier_id)
+
+    # Отдаём файл
+    from django.http import FileResponse
+
+    filename = f"certificate_{dossier.get_full_name().replace(' ', '_')}_{suffix}.pdf"
+
+    response = FileResponse(file_field.open('rb'), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
     return response
+
+
+@backoffice_required
+def export_dossier_certificate_no_stamp(request, dossier_id):
+    """Скачать сертификат без печати"""
+    return export_dossier_certificate_pdf(request, dossier_id, with_stamp=False)
+
+
+@backoffice_required
+def export_dossier_certificate_with_stamp(request, dossier_id):
+    """Скачать сертификат с печатью"""
+    return export_dossier_certificate_pdf(request, dossier_id, with_stamp=True)
 
 def backoffice_logout(request):
     """Выход из backoffice"""
