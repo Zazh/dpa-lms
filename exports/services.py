@@ -159,3 +159,64 @@ class QuizResultPDFService:
             })
 
         return responses
+
+
+class CertificatePDFService:
+    """Сервис генерации сертификатов в PDF"""
+
+    CSS_FILES = [
+        'exports/css/certificate.css',
+    ]
+
+    def __init__(self):
+        self.generator = PDFGenerator()
+
+    def generate(self, graduate) -> bytes:
+        """
+        Генерирует PDF сертификат
+
+        Args:
+            graduate: Graduate instance
+
+        Returns:
+            bytes: PDF документ
+        """
+        context = {
+            'graduate': graduate,
+            'student_name': graduate.user.get_full_name(),
+            'course_title': graduate.course.title,
+            'certificate_number': graduate.certificate_number,
+            'completed_at': graduate.completed_at,
+            'group_name': graduate.group.name if graduate.group else '',
+        }
+
+        return self.generator.generate_from_template(
+            'exports/certificate.html',
+            context,
+            css_files=self.CSS_FILES
+        )
+
+    def generate_from_dossier(self, dossier) -> bytes:
+        """
+        Генерирует PDF сертификат из данных досье
+
+        Args:
+            dossier: StudentDossier instance
+
+        Returns:
+            bytes: PDF документ
+        """
+        context = {
+            'student_name': dossier.get_full_name(),
+            'course_title': dossier.course_title,
+            'certificate_number': dossier.certificate_number,
+            'completed_at': dossier.completed_at,
+            'group_name': dossier.group_name,
+            'from_dossier': True,
+        }
+
+        return self.generator.generate_from_template(
+            'exports/certificate.html',
+            context,
+            css_files=self.CSS_FILES
+        )

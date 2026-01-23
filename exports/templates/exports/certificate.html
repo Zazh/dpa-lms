@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Сертификат</title>
+</head>
+<body>
+    <div class="certificate">
+        <div class="certificate-border"></div>
+
+        <div class="certificate-header">
+            <div class="certificate-title">Сертификат</div>
+            <div class="certificate-subtitle">подтверждает, что</div>
+        </div>
+
+        <div class="certificate-body">
+            <div class="student-name">{{ student_name }}</div>
+
+            <div class="course-label">успешно завершил(а) курс</div>
+            <div class="course-title">{{ course_title }}</div>
+
+            {% if group_name %}
+            <div class="certificate-label">Группа: {{ group_name }}</div>
+            {% endif %}
+        </div>
+
+        <div class="certificate-footer">
+            <div class="footer-item">
+                <div class="footer-line">Подпись руководителя</div>
+            </div>
+            <div class="footer-item">
+                <div class="footer-line">Печать</div>
+            </div>
+        </div>
+
+        <div class="certificate-date">
+            Дата выдачи:
+            {% if from_dossier %}
+                {{ completed_at|date:"d.m.Y" }}
+            {% else %}
+                {{ completed_at|date:"d.m.Y" }}
+            {% endif %}
+        </div>
+
+        <div class="certificate-number">№ {{ certificate_number }}</div>
+    </div>
+</body>
+</html>

@@ -45,5 +45,6 @@ urlpatterns = [
 
     # Экспорт PDF
     path('dossier/students/<int:dossier_id>/quiz/<int:quiz_index>/export-pdf/', views.export_dossier_quiz_pdf, name='export_dossier_quiz_pdf'),
+    path('dossier/students/<int:dossier_id>/certificate/export-pdf/', views.export_dossier_certificate_pdf, name='export_dossier_certificate_pdf'),
 
 ]

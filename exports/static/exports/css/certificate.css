@@ -1,0 +1,123 @@
+@page {
+    size: A4 landscape;
+    margin: 0;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'DejaVu Sans', sans-serif;
+    width: 297mm;
+    height: 210mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.certificate {
+    width: 277mm;
+    height: 190mm;
+    border: 3px solid #1e40af;
+    padding: 20mm;
+    text-align: center;
+    position: relative;
+}
+
+.certificate-border {
+    position: absolute;
+    top: 5mm;
+    left: 5mm;
+    right: 5mm;
+    bottom: 5mm;
+    border: 1px solid #3b82f6;
+}
+
+.certificate-header {
+    margin-bottom: 15mm;
+}
+
+.certificate-title {
+    font-size: 32px;
+    font-weight: bold;
+    color: #1e40af;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    margin-bottom: 5mm;
+}
+
+.certificate-subtitle {
+    font-size: 14px;
+    color: #64748b;
+}
+
+.certificate-body {
+    margin-bottom: 15mm;
+}
+
+.certificate-label {
+    font-size: 12px;
+    color: #64748b;
+    margin-bottom: 3mm;
+}
+
+.student-name {
+    font-size: 28px;
+    font-weight: bold;
+    color: #111827;
+    margin-bottom: 10mm;
+    padding-bottom: 3mm;
+    border-bottom: 2px solid #1e40af;
+    display: inline-block;
+}
+
+.course-label {
+    font-size: 14px;
+    color: #64748b;
+    margin-bottom: 3mm;
+}
+
+.course-title {
+    font-size: 20px;
+    font-weight: bold;
+    color: #1e40af;
+    margin-bottom: 10mm;
+}
+
+.certificate-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: 15mm;
+}
+
+.footer-item {
+    text-align: center;
+    width: 45%;
+}
+
+.footer-line {
+    border-top: 1px solid #111827;
+    padding-top: 2mm;
+    font-size: 10px;
+    color: #64748b;
+}
+
+.certificate-number {
+    position: absolute;
+    bottom: 10mm;
+    right: 15mm;
+    font-size: 10px;
+    color: #94a3b8;
+}
+
+.certificate-date {
+    position: absolute;
+    bottom: 10mm;
+    left: 15mm;
+    font-size: 10px;
+    color: #94a3b8;
+}
