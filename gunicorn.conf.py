@@ -1,8 +1,7 @@
 # Gunicorn configuration
-import multiprocessing
 
-# Кол-во воркеров (рекомендуется: 2-4 × CPU cores)
-workers = 4
+# Для 2GB RAM VPS — 2 воркера
+workers = 2
 
 # Адрес и порт
 bind = "0.0.0.0:8007"

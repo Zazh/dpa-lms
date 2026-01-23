@@ -704,6 +704,46 @@ def backoffice_login(request):
     return render(request, 'backoffice/login.html')
 
 
+@backoffice_required
+def export_dossier_quiz_pdf(request, dossier_id, quiz_index):
+    """Экспорт результатов теста из досье в PDF"""
+
+    from dossier.models import StudentDossier
+    from exports.services import QuizResultPDFService
+
+    user = request.user
+
+    # Проверка доступа
+    if not (user.is_super_instructor() or user.is_super_manager()):
+        messages.error(request, 'Доступ к досье только для супер-менеджеров и супер-инструкторов')
+        return redirect('backoffice:dashboard')
+
+    dossier = get_object_or_404(StudentDossier, id=dossier_id)
+
+    # Генерация PDF
+    service = QuizResultPDFService()
+
+    try:
+        pdf_content = service.generate_from_dossier(dossier, quiz_index)
+    except ValueError as e:
+        messages.error(request, str(e))
+        return redirect('backoffice:student_dossier_detail', dossier_id=dossier_id)
+    except Exception as e:
+        messages.error(request, f'Ошибка генерации PDF: {str(e)}')
+        return redirect('backoffice:student_dossier_detail', dossier_id=dossier_id)
+
+    # Имя файла
+    student_name = dossier.get_full_name().replace(' ', '_')
+    quiz_data = dossier.quizzes_history[quiz_index]
+    lesson_title = quiz_data.get('lesson_title', 'test').replace(' ', '_')[:30]
+    filename = f"quiz_{student_name}_{lesson_title}.pdf"
+
+    from django.http import HttpResponse
+    response = HttpResponse(pdf_content, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    return response
+
 def backoffice_logout(request):
     """Выход из backoffice"""
     logout(request)

@@ -94,3 +94,68 @@ class QuizResultPDFService:
             context,
             css_files=self.CSS_FILES
         )
+
+    def generate_from_dossier(self, dossier, quiz_index: int) -> bytes:
+        """
+        Генерирует PDF с результатами теста из данных досье
+
+        Args:
+            dossier: StudentDossier instance
+            quiz_index: индекс теста в quizzes_history
+
+        Returns:
+            bytes: PDF документ
+        """
+        quizzes = dossier.quizzes_history
+
+        if not quizzes or quiz_index >= len(quizzes):
+            raise ValueError('Тест не найден в досье')
+
+        quiz_data = quizzes[quiz_index]
+
+        context = {
+            'attempt': {
+                'attempt_number': quiz_data.get('attempt_number', 1),
+                'score_percentage': quiz_data.get('score_percentage', 0),
+                'completed_at': quiz_data.get('completed_at', ''),
+            },
+            'quiz': {
+                'lesson': {'title': quiz_data.get('lesson_title', '')},
+                'passing_score': quiz_data.get('passing_score', 70),
+            },
+            'student': {
+                'get_full_name': dossier.get_full_name(),
+            },
+            'course': {
+                'title': dossier.course_title,
+            },
+            'responses': self._convert_questions_to_responses(quiz_data.get('questions', [])),
+            'total_questions': len(quiz_data.get('questions', [])),
+            'correct_answers': sum(1 for q in quiz_data.get('questions', []) if q.get('is_correct')),
+            'passed': quiz_data.get('passed', False),
+            'from_dossier': True,
+        }
+
+        return self.generator.generate_from_template(
+            'exports/quiz_result.html',
+            context,
+            css_files=self.CSS_FILES
+        )
+
+    def _convert_questions_to_responses(self, questions: list) -> list:
+        """Конвертирует формат вопросов из досье в формат для шаблона"""
+        responses = []
+
+        for q in questions:
+            responses.append({
+                'is_correct': q.get('is_correct', False),
+                'question': {
+                    'question_text': q.get('question_text', ''),
+                },
+                'user_answers': q.get('user_answers', []),
+                'correct_answers': q.get('correct_answers', []),
+                'points_earned': q.get('points_earned', 0),
+                'max_points': q.get('max_points', 1),
+            })
+
+        return responses

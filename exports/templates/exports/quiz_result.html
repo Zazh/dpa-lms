@@ -7,13 +7,25 @@
 <body>
     <div class="header">
         <h1>Результаты теста</h1>
-        <div class="subtitle">{{ quiz.lesson.title }}</div>
+        <div class="subtitle">
+            {% if from_dossier %}
+                {{ quiz.lesson.title }}
+            {% else %}
+                {{ quiz.lesson.title }}
+            {% endif %}
+        </div>
     </div>
 
     <div class="info-block">
         <div class="info-item">
             <div class="info-label">Студент</div>
-            <div class="info-value">{{ student.get_full_name }}</div>
+            <div class="info-value">
+                {% if from_dossier %}
+                    {{ student.get_full_name }}
+                {% else %}
+                    {{ student.get_full_name }}
+                {% endif %}
+            </div>
         </div>
         <div class="info-item">
             <div class="info-label">Курс</div>
@@ -21,16 +33,34 @@
         </div>
         <div class="info-item">
             <div class="info-label">Попытка</div>
-            <div class="info-value">#{{ attempt.attempt_number }}</div>
+            <div class="info-value">
+                {% if from_dossier %}
+                    #{{ attempt.attempt_number }}
+                {% else %}
+                    #{{ attempt.attempt_number }}
+                {% endif %}
+            </div>
         </div>
         <div class="info-item">
             <div class="info-label">Дата</div>
-            <div class="info-value">{{ attempt.completed_at|date:"d.m.Y H:i" }}</div>
+            <div class="info-value">
+                {% if from_dossier %}
+                    {{ attempt.completed_at|slice:":10" }}
+                {% else %}
+                    {{ attempt.completed_at|date:"d.m.Y H:i" }}
+                {% endif %}
+            </div>
         </div>
     </div>
 
     <div class="result-box {% if passed %}passed{% else %}failed{% endif %}">
-        <div class="result-score">{{ attempt.score_percentage }}%</div>
+        <div class="result-score">
+            {% if from_dossier %}
+                {{ attempt.score_percentage|floatformat:0 }}%
+            {% else %}
+                {{ attempt.score_percentage }}%
+            {% endif %}
+        </div>
         <div class="result-status">
             {% if passed %}
                 ✓ Тест сдан
@@ -55,35 +85,70 @@
                 </span>
             </div>
 
-            <div class="question-text">{{ response.question.question_text }}</div>
+            <div class="question-text">
+                {% if from_dossier %}
+                    {{ response.question.question_text }}
+                {% else %}
+                    {{ response.question.question_text }}
+                {% endif %}
+            </div>
 
             <div class="answers-list">
-                {% for answer in response.question.answers.all %}
-                <div class="answer-item">
-                    <div class="answer-marker">
-                        {% if answer in response.selected_answers.all %}
-                            {% if answer.is_correct %}●{% else %}✗{% endif %}
-                        {% else %}
-                            ○
-                        {% endif %}
+                {% if from_dossier %}
+                    <!-- Формат из досье -->
+                    <div class="answer-item">
+                        <div class="answer-text selected">
+                            <strong>Ответ студента:</strong>
+                            {% for ans in response.user_answers %}
+                                {{ ans }}{% if not forloop.last %}, {% endif %}
+                            {% empty %}
+                                <em>Нет ответа</em>
+                            {% endfor %}
+                        </div>
                     </div>
-                    <div class="answer-text
-                        {% if answer in response.selected_answers.all %}selected{% endif %}
-                        {% if answer.is_correct %}correct{% elif answer in response.selected_answers.all %}incorrect{% endif %}">
-                        {{ answer.answer_text }}
-                        {% if answer.is_correct and answer not in response.selected_answers.all %}
-                            <small>(правильный ответ)</small>
-                        {% endif %}
+                    {% if not response.is_correct %}
+                    <div class="answer-item">
+                        <div class="answer-text correct">
+                            <strong>Правильный ответ:</strong>
+                            {% for ans in response.correct_answers %}
+                                {{ ans }}{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        </div>
                     </div>
-                </div>
-                {% endfor %}
+                    {% endif %}
+                {% else %}
+                    <!-- Формат из базы данных -->
+                    {% for answer in response.question.answers.all %}
+                    <div class="answer-item">
+                        <div class="answer-marker">
+                            {% if answer in response.selected_answers.all %}
+                                {% if answer.is_correct %}●{% else %}✗{% endif %}
+                            {% else %}
+                                ○
+                            {% endif %}
+                        </div>
+                        <div class="answer-text
+                            {% if answer in response.selected_answers.all %}selected{% endif %}
+                            {% if answer.is_correct %}correct{% elif answer in response.selected_answers.all %}incorrect{% endif %}">
+                            {{ answer.answer_text }}
+                            {% if answer.is_correct and answer not in response.selected_answers.all %}
+                                <small>(правильный ответ)</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% endif %}
             </div>
         </div>
         {% endfor %}
     </div>
 
     <div class="footer">
-        Документ сформирован автоматически • {{ attempt.completed_at|date:"d.m.Y H:i" }}
+        {% if from_dossier %}
+            Документ сформирован из досье • {{ attempt.completed_at|slice:":10" }}
+        {% else %}
+            Документ сформирован автоматически • {{ attempt.completed_at|date:"d.m.Y H:i" }}
+        {% endif %}
     </div>
 </body>
 </html>
