@@ -50,12 +50,6 @@ class StudentDossier(models.Model):
         unique=True,
         db_index=True
     )
-    certificate_file = models.FileField(
-        'Файл сертификата',
-        upload_to='dossier/certificates/%Y/%m/',
-        blank=True,
-        null=True
-    )
 
     # === ДАТЫ ===
     enrolled_at = models.DateTimeField('Дата зачисления')

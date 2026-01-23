@@ -132,27 +132,25 @@ class NotificationService:
             logger.info(f"Отправлен email о доработке ДЗ для {user.email}")
 
     @classmethod
+    @classmethod
     def notify_graduation(cls, user, graduate):
         """
-        Уведомление: выпуск подтвержден
-        Вызывается когда менеджер подтверждает выпуск студента
+        Уведомление: выпуск подтвержден (только in-app)
+        Email с сертификатом отправляется отдельно после генерации PDF
         """
         logger.info(f"Отправка уведомления о выпуске для {user.email}")
 
         prefs = cls._get_user_preferences(user)
 
-        # 1. In-app уведомление
+        # In-app уведомление
         if prefs.graduation_in_app:
+            cert_number = graduate.certificate.number if hasattr(graduate, 'certificate') and graduate.certificate else ''
+
             Notification.objects.create(
                 user=user,
                 type='graduation',
                 title='🎓 Поздравляем с выпуском!',
-                message=f'Вы успешно завершили курс "{graduate.course.title}" и получили сертификат! Номер сертификата: {graduate.certificate_number}',
+                message=f'Вы успешно завершили курс "{graduate.course.title}"! Номер сертификата: {cert_number}. Сертификат отправлен на вашу почту.',
                 link='/profile/certificates/'
             )
             logger.info(f"Создано in-app уведомление о выпуске для {user.email}")
-
-        # 2. Email уведомление
-        if prefs.graduation_email:
-            EmailService.send_graduation_email(user, graduate)
-            logger.info(f"Отправлен email о выпуске для {user.email}")

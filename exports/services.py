@@ -185,7 +185,7 @@ class CertificatePDFService:
         context = {
             'student_name': graduate.user.get_full_name(),
             'course_title': graduate.course.title,
-            'certificate_number': graduate.certificate_number,
+            'certificate_number': graduate.certificate.number if hasattr(graduate, 'certificate') and graduate.certificate else '',
             'completed_at': graduate.completed_at,
             'group_name': graduate.group.name if graduate.group else '',
             'with_stamp': with_stamp,

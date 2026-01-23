@@ -108,29 +108,6 @@ class Graduate(models.Model):
         help_text='Даты прохождения модулей, уроков, попытки тестов'
     )
 
-    # === СЕРТИФИКАТ ===
-    certificate_number = models.CharField(
-        'Номер сертификата',
-        max_length=50,
-        unique=True,
-        blank=True,
-        null=True,
-        db_index=True
-    )
-
-    certificate_file = models.FileField(
-        'Файл сертификата',
-        upload_to='certificates/%Y/%m/',
-        blank=True,
-        null=True
-    )
-
-    certificate_issued_at = models.DateTimeField(
-        'Дата выдачи сертификата',
-        null=True,
-        blank=True
-    )
-
     # === ДОПОЛНИТЕЛЬНО ===
     notes = models.TextField('Примечания менеджера', blank=True)
 
@@ -143,7 +120,6 @@ class Graduate(models.Model):
             models.Index(fields=['user', 'course']),
             models.Index(fields=['status', '-completed_at']),
             models.Index(fields=['group', 'status']),
-            models.Index(fields=['certificate_number']),
         ]
 
     def __str__(self):
@@ -261,11 +237,12 @@ class Graduate(models.Model):
             from dossier.services import DossierService
             DossierService.create_student_dossier(self)
 
-        # После успешной транзакции — фоновые задачи
+        # После успешной транзакции — генерация PDF в фоне
+        # Email с сертификатом отправится после успешной генерации
         from certificates.tasks import generate_certificate_pdf
         generate_certificate_pdf.delay(certificate.id)
 
-        # Уведомление студенту
+        # In-app уведомление (email отправляется из Celery после генерации PDF)
         from notifications.services import NotificationService
         NotificationService.notify_graduation(self.user, self)
 

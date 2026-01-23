@@ -58,8 +58,13 @@ class SendPulseService:
             html_content: str,
             from_email: Optional[str] = None,
             from_name: Optional[str] = None,
+            attachments: Optional[list] = None,
     ) -> Dict[str, Any]:
-        """Отправить email через SendPulse API"""
+        """
+        Отправить email через SendPulse API
+
+        attachments: список словарей [{'filename': 'cert.pdf', 'data': base64_string}]
+        """
         token = self._get_access_token()
         if not token:
             return {
@@ -81,13 +86,13 @@ class SendPulseService:
         logger.info(f"From: {sender_email}")
         logger.info(f"To: {to_email}")
         logger.info(f"Subject: {subject}")
-        logger.info(f"API ID: {self.api_id}")
+        logger.info(f"Attachments: {len(attachments) if attachments else 0}")
         logger.info("=" * 50)
 
-        # ПРОСТОЙ PAYLOAD - текст И html
+        # Payload
         payload = {
             'email': {
-                'text': html_content,  # ← ДОБАВИЛИ текстовую версию
+                'text': html_content,
                 'html': html_content,
                 'subject': subject,
                 'from': {
@@ -101,8 +106,12 @@ class SendPulseService:
             }
         }
 
+        # Добавляем attachments если есть
+        if attachments:
+            payload['email']['attachments_binary'] = attachments
+
         try:
-            response = requests.post(url, json=payload, headers=headers, timeout=15)
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
             response.raise_for_status()
             result = response.json()
 

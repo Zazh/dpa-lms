@@ -95,7 +95,8 @@ class DownloadCertificateView(APIView):
                 graduate.certificate_file.open('rb'),
                 content_type='application/pdf'
             )
-            response['Content-Disposition'] = f'attachment; filename="certificate_{graduate.certificate_number}.pdf"'
+            cert_number = graduate.certificate.number if hasattr(graduate, 'certificate') and graduate.certificate else graduate.id
+            response['Content-Disposition'] = f'attachment; filename="certificate_{cert_number}.pdf"'
             return response
         except FileNotFoundError:
             raise Http404('Файл сертификата не найден')

@@ -27,7 +27,7 @@ class CertificateService:
             holder_name=graduate.user.get_full_name(),
             course_title=graduate.course.title,
             group_name=graduate.group.name if graduate.group else '',
-            issued_at=timezone.now().date(),
+            issued_at=timezone.localdate(),
         )
 
         return certificate

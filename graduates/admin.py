@@ -19,7 +19,7 @@ class GraduateAdmin(admin.ModelAdmin):
         'total_lessons_completed',
         'completed_at_display',
         'graduated_at_display',
-        'certificate_number',
+        'certificate_info',
     ]
 
     list_filter = [
@@ -36,7 +36,7 @@ class GraduateAdmin(admin.ModelAdmin):
         'user__last_name',
         'user__iin',
         'user__phone',
-        'certificate_number',
+        'certificate__number',
     ]
 
     readonly_fields = [
@@ -51,6 +51,7 @@ class GraduateAdmin(admin.ModelAdmin):
         'quiz_attempts_display',
         'instructor_display',
         'student_full_info',
+        'certificate_display',
     ]
 
     fieldsets = (
@@ -89,11 +90,7 @@ class GraduateAdmin(admin.ModelAdmin):
             )
         }),
         ('📜 Сертификат', {
-            'fields': (
-                'certificate_number',
-                'certificate_file',
-                'certificate_issued_at',
-            )
+            'fields': ('certificate_display',)
         }),
         ('📝 Примечания', {
             'fields': ('notes',),
@@ -104,7 +101,6 @@ class GraduateAdmin(admin.ModelAdmin):
     actions = [
         'approve_graduation_action',
         'reject_graduation_action',
-        'generate_certificates_action',
     ]
 
     date_hierarchy = 'completed_at'
@@ -226,6 +222,89 @@ class GraduateAdmin(admin.ModelAdmin):
 
     instructor_display.short_description = 'Инструктор группы'
 
+    def certificate_info(self, obj):
+        """Информация о сертификате в списке"""
+        if hasattr(obj, 'certificate') and obj.certificate:
+            cert = obj.certificate
+            if cert.status == 'ready':
+                return format_html(
+                    '<span style="color: #28a745;">✅ {}</span>',
+                    cert.number
+                )
+            elif cert.status == 'pending':
+                return format_html('<span style="color: #ffc107;">⏳ Генерируется</span>')
+            else:
+                return format_html('<span style="color: #dc3545;">❌ Ошибка</span>')
+        return format_html('<span style="color: #999;">—</span>')
+
+    certificate_info.short_description = 'Сертификат'
+
+    def certificate_display(self, obj):
+        """Детальная информация о сертификате"""
+        if hasattr(obj, 'certificate') and obj.certificate:
+            cert = obj.certificate
+            status_colors = {
+                'ready': '#28a745',
+                'pending': '#ffc107',
+                'error': '#dc3545',
+            }
+            status_icons = {
+                'ready': '✅',
+                'pending': '⏳',
+                'error': '❌',
+            }
+
+            html = f'''
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 5px;"><strong>Номер:</strong></td>
+                    <td style="padding: 5px;">{cert.number}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 5px;"><strong>Статус:</strong></td>
+                    <td style="padding: 5px;">
+                        <span style="color: {status_colors.get(cert.status, '#999')};">
+                            {status_icons.get(cert.status, '❓')} {cert.get_status_display()}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 5px;"><strong>Дата выдачи:</strong></td>
+                    <td style="padding: 5px;">{cert.issued_at.strftime('%d.%m.%Y') if cert.issued_at else '—'}</td>
+                </tr>
+            '''
+
+            if cert.status == 'ready':
+                if cert.file_without_stamp:
+                    html += f'''
+                    <tr>
+                        <td style="padding: 5px;"><strong>Без печати:</strong></td>
+                        <td style="padding: 5px;"><a href="{cert.file_without_stamp.url}" target="_blank">📄 Скачать</a></td>
+                    </tr>
+                    '''
+                if cert.file_with_stamp:
+                    html += f'''
+                    <tr>
+                        <td style="padding: 5px;"><strong>С печатью:</strong></td>
+                        <td style="padding: 5px;"><a href="{cert.file_with_stamp.url}" target="_blank">🎓 Скачать</a></td>
+                    </tr>
+                    '''
+
+            if cert.status == 'error' and cert.error_message:
+                html += f'''
+                <tr>
+                    <td style="padding: 5px;"><strong>Ошибка:</strong></td>
+                    <td style="padding: 5px; color: #dc3545;">{cert.error_message}</td>
+                </tr>
+                '''
+
+            html += '</table>'
+            return format_html(html)
+
+        return format_html('<span style="color: #999;">Сертификат не создан</span>')
+
+    certificate_display.short_description = 'Сертификат'
+
     def quiz_attempts_display(self, obj):
         """Отображение попыток тестов"""
         attempts = obj.get_quiz_attempts_summary()
@@ -310,7 +389,7 @@ class GraduateAdmin(admin.ModelAdmin):
 
         self.message_user(
             request,
-            f'🎓 Выпущено студентов: {count}',
+            f'🎓 Выпущено студентов: {count}. Сертификаты генерируются в фоне...',
             level=messages.SUCCESS
         )
 
@@ -341,31 +420,6 @@ class GraduateAdmin(admin.ModelAdmin):
 
     reject_graduation_action.short_description = '❌ Отклонить выпуск'
 
-    def generate_certificates_action(self, request, queryset):
-        """Сгенерировать номера сертификатов"""
-        graduated = queryset.filter(status='graduated', certificate_number__isnull=True)
-
-        if not graduated.exists():
-            self.message_user(
-                request,
-                '❌ Нет выпускников без номера сертификата',
-                level=messages.ERROR
-            )
-            return
-
-        count = 0
-        for graduate in graduated:
-            graduate.generate_certificate_number()
-            count += 1
-
-        self.message_user(
-            request,
-            f'📜 Сгенерировано номеров сертификатов: {count}',
-            level=messages.SUCCESS
-        )
-
-    generate_certificates_action.short_description = '📜 Сгенерировать номера сертификатов'
-
     # === НАСТРОЙКИ ===
 
     def get_queryset(self, request):
@@ -375,7 +429,8 @@ class GraduateAdmin(admin.ModelAdmin):
             'user',
             'course',
             'group',
-            'graduated_by'
+            'graduated_by',
+            'certificate'
         )
 
     def has_add_permission(self, request):
