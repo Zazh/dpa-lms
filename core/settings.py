@@ -204,6 +204,19 @@ SENDPULSE_FROM_EMAIL = config('SENDPULSE_FROM_EMAIL', default='')
 SENDPULSE_FROM_NAME = config('SENDPULSE_FROM_NAME', default='')
 SENDPULSE_API_URL = 'https://api.sendpulse.com'
 
+# CELERY
+CELERY_BROKER_URL = config('CELERY_BROKER_URL', default='redis://redis:6379/0')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND', default='redis://redis:6379/0')
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+# Опции для надёжности
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+
 # DEBUG TOOLS (только для разработки)
 if DEBUG:
     # Django Silk - профилирование запросов
