@@ -187,6 +187,15 @@ SIGEX_API_URL = 'https://sigex.kz'
 # Для аутентификации данные для подписания (простая строка)
 SIGEX_AUTH_DATA = 'LMS Authentication Request'
 
+# =============================================================================
+# PASSWORD HASHING
+# =============================================================================
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+]
 
 # SendPulse Configuration
 SENDPULSE_API_ID = config('SENDPULSE_API_ID', default='')
