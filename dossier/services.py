@@ -308,6 +308,9 @@ class DossierService:
         """
         Создать или обновить досье инструктора.
 
+        Статистика берётся из StudentDossier (где инструктор указан),
+        а не из текущих назначений в группы.
+
         Args:
             user: объект User с ролью instructor/super_instructor
 
@@ -315,8 +318,7 @@ class DossierService:
             InstructorDossier
         """
         from assignments.models import AssignmentSubmission
-        from groups.models import Group
-        from graduates.models import Graduate
+        from groups.models import GroupMembership
 
         # Получаем или создаем досье
         dossier, created = InstructorDossier.objects.get_or_create(
@@ -341,25 +343,36 @@ class DossierService:
         dossier.phone = getattr(user, 'phone', '') or ''
         dossier.role = user.role
 
-        # Статистика по группам
-        assigned_groups = user.assigned_groups.all()
-        dossier.total_groups_led = assigned_groups.count()
+        # === СТАТИСТИКА ИЗ ДОСЬЕ СТУДЕНТОВ ===
+        # Это источник правды — кого реально выпустил
+        graduates_taught = StudentDossier.objects.filter(instructor_email=user.email)
 
-        # Статистика по студентам
-        from groups.models import GroupMembership
-        total_students = GroupMembership.objects.filter(
-            group__in=assigned_groups
+        # Выпускники
+        dossier.total_graduates = graduates_taught.count()
+
+        # Уникальные группы из досье (исторические)
+        historical_groups = list(graduates_taught.values('group_name').annotate(
+            students_count=Count('id')
+        ).order_by('group_name'))
+
+        # Текущие назначения (активные группы)
+        current_groups = user.assigned_groups.all()
+
+        # Текущие студенты в активных группах (ещё не выпущены)
+        current_students = GroupMembership.objects.filter(
+            group__in=current_groups
         ).values('user').distinct().count()
-        dossier.total_students_taught = total_students
 
-        # Статистика по выпускникам
-        total_graduates = Graduate.objects.filter(
-            group__in=assigned_groups,
-            status='graduated'
-        ).count()
-        dossier.total_graduates = total_graduates
+        # Всего студентов = выпускники + текущие
+        dossier.total_students_taught = dossier.total_graduates
 
-        # Статистика по ДЗ
+        # Всего групп = исторические + текущие (уникальные)
+        historical_group_names = set(g['group_name'] for g in historical_groups)
+        current_group_names = set(g.name for g in current_groups)
+        all_groups = historical_group_names | current_group_names
+        dossier.total_groups_led = len(all_groups)
+
+        # === СТАТИСТИКА ПО ДЗ ===
         reviews = AssignmentSubmission.objects.filter(reviewed_by=user)
         dossier.total_assignments_reviewed = reviews.count()
         dossier.total_assignments_passed = reviews.filter(status='passed').count()
@@ -369,24 +382,45 @@ class DossierService:
         avg_score = reviews.filter(score__isnull=False).aggregate(Avg('score'))
         dossier.average_score_given = avg_score['score__avg'] or 0
 
-        # История групп
+        # === ИСТОРИЯ ГРУПП ===
         groups_history = []
-        for group in assigned_groups:
-            students_count = GroupMembership.objects.filter(group=group).count()
-            graduates_count = Graduate.objects.filter(group=group, status='graduated').count()
 
+        # Исторические группы (из досье студентов)
+        for group_data in historical_groups:
             groups_history.append({
-                'group_id': group.id,
-                'group_name': group.name,
-                'course_title': group.course.title if group.course else '',
-                'students_count': students_count,
-                'graduates_count': graduates_count,
-                'created_at': group.created_at.isoformat() if group.created_at else None,
+                'group_name': group_data['group_name'],
+                'graduates_count': group_data['students_count'],
+                'status': 'completed',
             })
+
+        # Текущие группы (ещё активные)
+        for group in current_groups:
+            # Пропускаем если уже есть в исторических
+            if group.name in historical_group_names:
+                # Обновляем существующую запись
+                for gh in groups_history:
+                    if gh['group_name'] == group.name:
+                        gh['course_title'] = group.course.title if group.course else ''
+                        gh['group_id'] = group.id
+                        gh['status'] = 'active'
+                        # Добавляем текущих студентов
+                        gh['current_students'] = GroupMembership.objects.filter(group=group).count()
+                        break
+            else:
+                # Новая активная группа
+                students_count = GroupMembership.objects.filter(group=group).count()
+                groups_history.append({
+                    'group_id': group.id,
+                    'group_name': group.name,
+                    'course_title': group.course.title if group.course else '',
+                    'current_students': students_count,
+                    'graduates_count': 0,
+                    'status': 'active',
+                })
 
         dossier.groups_history = groups_history
 
-        # Сводка проверок по месяцам
+        # === СВОДКА ПРОВЕРОК ПО МЕСЯЦАМ ===
         from django.db.models.functions import TruncMonth
         reviews_by_month = reviews.annotate(
             month=TruncMonth('reviewed_at')
