@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Результаты теста</title>
+</head>
+<body>
+    <div class="header">
+        <h1>Результаты теста</h1>
+        <div class="subtitle">{{ quiz.lesson.title }}</div>
+    </div>
+
+    <div class="info-block">
+        <div class="info-item">
+            <div class="info-label">Студент</div>
+            <div class="info-value">{{ student.get_full_name }}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Курс</div>
+            <div class="info-value">{{ course.title }}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Попытка</div>
+            <div class="info-value">#{{ attempt.attempt_number }}</div>
+        </div>
+        <div class="info-item">
+            <div class="info-label">Дата</div>
+            <div class="info-value">{{ attempt.completed_at|date:"d.m.Y H:i" }}</div>
+        </div>
+    </div>
+
+    <div class="result-box {% if passed %}passed{% else %}failed{% endif %}">
+        <div class="result-score">{{ attempt.score_percentage }}%</div>
+        <div class="result-status">
+            {% if passed %}
+                ✓ Тест сдан
+            {% else %}
+                ✗ Тест не сдан (проходной балл: {{ quiz.passing_score }}%)
+            {% endif %}
+        </div>
+        <div style="margin-top: 10px; font-size: 12px;">
+            Правильных ответов: {{ correct_answers }} из {{ total_questions }}
+        </div>
+    </div>
+
+    <div class="questions-section">
+        <h2>Детализация ответов</h2>
+
+        {% for response in responses %}
+        <div class="question-item">
+            <div class="question-header">
+                <span class="question-number">Вопрос {{ forloop.counter }}</span>
+                <span class="question-status {% if response.is_correct %}correct{% else %}incorrect{% endif %}">
+                    {% if response.is_correct %}Верно{% else %}Неверно{% endif %}
+                </span>
+            </div>
+
+            <div class="question-text">{{ response.question.question_text }}</div>
+
+            <div class="answers-list">
+                {% for answer in response.question.answers.all %}
+                <div class="answer-item">
+                    <div class="answer-marker">
+                        {% if answer in response.selected_answers.all %}
+                            {% if answer.is_correct %}●{% else %}✗{% endif %}
+                        {% else %}
+                            ○
+                        {% endif %}
+                    </div>
+                    <div class="answer-text
+                        {% if answer in response.selected_answers.all %}selected{% endif %}
+                        {% if answer.is_correct %}correct{% elif answer in response.selected_answers.all %}incorrect{% endif %}">
+                        {{ answer.answer_text }}
+                        {% if answer.is_correct and answer not in response.selected_answers.all %}
+                            <small>(правильный ответ)</small>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="footer">
+        Документ сформирован автоматически • {{ attempt.completed_at|date:"d.m.Y H:i" }}
+    </div>
+</body>
+</html>
