@@ -1,6 +1,7 @@
 from pathlib import Path
 from decouple import config
 from datetime import timedelta
+from celery.schedules import crontab
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -217,6 +218,14 @@ CELERY_TIMEZONE = TIME_ZONE
 # Опции для надёжности
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
+
+CELERY_BEAT_SCHEDULE = {
+    # Создание досье инструкторов — каждый день в 3:00
+    'create-instructor-dossiers': {
+        'task': 'dossier.tasks.create_instructor_dossiers_task',
+        'schedule': crontab(hour=3, minute=0),
+    },
+}
 
 # DEBUG TOOLS (только для разработки)
 if DEBUG:
