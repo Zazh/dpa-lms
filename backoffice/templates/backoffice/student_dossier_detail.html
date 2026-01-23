@@ -159,15 +159,14 @@
         {% if dossier.quizzes_history %}
         <div class="bg-white shadow rounded-lg">
             <div class="px-4 py-5 sm:p-6">
-                <h2 class="text-lg font-medium text-gray-900 mb-4">🎯 Тесты ({{ dossier.quizzes_history|length }} попыток)</h2>
-
+                <h2 class="text-lg font-medium text-gray-900 mb-4">🎯 Сданные тесты ({{ dossier.quizzes_history|length }})</h2>
                 {% for quiz in dossier.quizzes_history %}
                 <div class="mb-6 border border-gray-200 rounded-lg overflow-hidden">
                     <!-- Заголовок теста -->
                     <div class="px-4 py-3 bg-gray-50 flex items-center justify-between">
                         <div>
                             <p class="font-medium text-gray-900">{{ quiz.lesson_title }}</p>
-                            <p class="text-xs text-gray-500">Попытка #{{ quiz.attempt_number }} | {{ quiz.completed_at|slice:":10" }}</p>
+                            <p class="text-xs text-gray-500">Сдан с {{ quiz.attempt_number }}-й попытки | {{ quiz.completed_at|slice:":10" }}</p>
                         </div>
                         <div class="flex items-center space-x-3">
                             <div class="text-right">

@@ -204,21 +204,36 @@ class DossierService:
 
     @classmethod
     def _collect_quizzes_history(cls, user, course):
-        """Собрать историю тестов с ответами"""
+        """Собрать только сданные тесты (первая успешная попытка для каждого теста)"""
         from quizzes.models import QuizAttempt
+        from django.db.models import F
 
         quizzes = []
-        attempts = QuizAttempt.objects.filter(
+
+        # Получаем только сданные попытки
+        passed_attempts = QuizAttempt.objects.filter(
             user=user,
             quiz__lesson__module__course=course,
-            status='completed'
+            status='completed',
+            score_percentage__gte=F('quiz__passing_score')
         ).select_related(
             'quiz', 'quiz__lesson'
         ).prefetch_related(
             'responses', 'responses__question', 'responses__selected_answers'
-        ).order_by('quiz__lesson__order', 'attempt_number')
+        ).order_by('quiz__lesson__module__order', 'quiz__lesson__order', 'attempt_number')
 
-        for attempt in attempts:
+        # Берём только первую успешную попытку для каждого теста
+        seen_quizzes = set()
+
+        for attempt in passed_attempts:
+            quiz_id = attempt.quiz.id
+
+            # Пропускаем если уже добавили этот тест
+            if quiz_id in seen_quizzes:
+                continue
+
+            seen_quizzes.add(quiz_id)
+
             questions_data = []
 
             for response in attempt.responses.all():
@@ -241,11 +256,11 @@ class DossierService:
                 })
 
             quizzes.append({
-                'quiz_id': attempt.quiz.id,
+                'quiz_id': quiz_id,
                 'lesson_title': attempt.quiz.lesson.title,
                 'attempt_number': attempt.attempt_number,
                 'score_percentage': float(attempt.score_percentage) if attempt.score_percentage else 0,
-                'passed': attempt.is_passed(),
+                'passed': True,  # Всегда True, так как фильтруем только сданные
                 'passing_score': attempt.quiz.passing_score,
                 'started_at': attempt.started_at.isoformat() if attempt.started_at else None,
                 'completed_at': attempt.completed_at.isoformat() if attempt.completed_at else None,
