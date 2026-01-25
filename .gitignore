@@ -5,6 +5,7 @@
 package.json
 package-lock.json
 /exports/static/exports/images
+/exports/static/exports/fonts
 
 __pycache__/
 *.py[cod]
