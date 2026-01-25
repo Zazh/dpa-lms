@@ -1,3 +1,25 @@
+/* Шрифты */
+@font-face {
+    font-family: 'CMU';
+    src: url('../fonts/cmun-400.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'CMU';
+    src: url('../fonts/cmun-500.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'CMU';
+    src: url('../fonts/cmun-700.ttf') format('truetype');
+    font-weight: 700;
+    font-style: normal;
+}
+
 @page {
     size: A4 landscape;
     margin: 0;
@@ -10,114 +32,150 @@
 }
 
 body {
-    font-family: 'DejaVu Sans', sans-serif;
+    font-family: 'CMU', serif;
     width: 297mm;
     height: 210mm;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: relative;
+    /* Калибровочный фон - потом заменить на bg-empty.jpg */
+    background-image: url('../images/bg-empty.jpg');
+    background-size: 297mm 210mm;
+    background-repeat: no-repeat;
+    background-position: top left;
 }
 
 .certificate {
-    width: 277mm;
-    height: 190mm;
-    border: 3px solid #1e40af;
-    padding: 20mm;
-    text-align: center;
-    position: relative;
+    width: 297mm;
+    height: 210mm;
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Padding подберёшь по калибровке */
+    padding: 15mm 20mm;
 }
 
+/* Убираем старую рамку - она теперь на фоне */
 .certificate-border {
-    position: absolute;
-    top: 5mm;
-    left: 5mm;
-    right: 5mm;
-    bottom: 5mm;
-    border: 1px solid #3b82f6;
+    display: none;
 }
 
 .certificate-header {
-    margin-bottom: 15mm;
+    text-align: center;
+    /* Отступ сверху - подбери по макету */
+    padding-top: 44mm;
+    margin-bottom: 10mm;
 }
 
 .certificate-title {
-    font-size: 32px;
-    font-weight: bold;
-    color: #1e40af;
+    font-size: 42pt;
+    font-weight: 700;
+    color: #bd8d45;
     text-transform: uppercase;
-    letter-spacing: 4px;
-    margin-bottom: 5mm;
+    letter-spacing: -0.075em;
+    margin-bottom: 8mm;
 }
 
 .certificate-subtitle {
-    font-size: 14px;
-    color: #64748b;
+    font-size: 14.5pt;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: #000000;
+    letter-spacing: -0.02em;
+
 }
 
 .certificate-body {
-    margin-bottom: 15mm;
-}
-
-.certificate-label {
-    font-size: 12px;
-    color: #64748b;
-    margin-bottom: 3mm;
+    text-align: center;
+    margin-bottom: 10mm;
 }
 
 .student-name {
-    font-size: 28px;
-    font-weight: bold;
+    font-size: 28pt;
+    font-weight: 700;
     color: #111827;
-    margin-bottom: 10mm;
+    margin-bottom: 1mm;
     padding-bottom: 3mm;
     border-bottom: 2px solid #1e40af;
     display: inline-block;
+    text-transform: uppercase;
 }
 
 .course-label {
-    font-size: 14px;
-    color: #64748b;
-    margin-bottom: 3mm;
+    font-size: 19pt;
+    font-weight: 500;
+    color: #000000;
+    margin-bottom: .25rem;
+        /*font-family: 'CAT Neuzeit', sans-serif;*/
+
+    /*letter-spacing: -0.05em;*/
+
 }
 
 .course-title {
-    font-size: 20px;
-    font-weight: bold;
-    color: #1e40af;
-    margin-bottom: 10mm;
+    font-size: 18pt;
+    font-weight: 700;
+    color: #bd8d45;
+    margin-bottom: 8mm;
+    padding: 0 20mm;
+    letter-spacing: -0.05em;
+    line-height: 1;
+    height: 20mm;
+}
+
+.certificate-label {
+    font-size: 12pt;
+    font-weight: 400;
+    color: #64748b;
 }
 
 .certificate-footer {
+    position: absolute;
+    bottom: 25mm;
+    left: 40mm;
+    right: 40mm;
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
-    margin-top: 15mm;
 }
 
 .footer-item {
     text-align: center;
-    width: 45%;
+    width: 35%;
+}
+.footer-text {
+    font-size: 14pt;
+    font-weight: bold;
 }
 
 .footer-line {
-    border-top: 1px solid #111827;
-    padding-top: 2mm;
-    font-size: 10px;
+    background: #000000;
+    padding-top: .5mm;
+    padding-bottom: .5mm;
+    font-size: 10pt;
     color: #64748b;
-}
-
-.certificate-number {
-    position: absolute;
-    bottom: 10mm;
-    right: 15mm;
-    font-size: 10px;
-    color: #94a3b8;
+    width: 80%;
+    margin: 0 auto;
 }
 
 .certificate-date {
     position: absolute;
-    bottom: 10mm;
-    left: 15mm;
-    font-size: 10px;
+    bottom: 15mm;
+    left: 20mm;
+    font-size: 10pt;
     color: #94a3b8;
+}
+
+.certificate-number {
+    position: absolute;
+    bottom: 15mm;
+    right: 20mm;
+    font-size: 10pt;
+    color: #94a3b8;
+}
+
+.stamp {
+    position: absolute;
+    /* Позиция печати - подбери по макету */
+    bottom: 40mm;
+    right: 60mm;
+    font-size: 12pt;
+    color: #666;
 }

@@ -4,6 +4,7 @@
 /node_modules
 package.json
 package-lock.json
+/exports/static/exports/
 
 __pycache__/
 *.py[cod]

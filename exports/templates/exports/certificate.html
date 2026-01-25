@@ -10,36 +10,36 @@
 
         <div class="certificate-header">
             <div class="certificate-title">Сертификат</div>
-            <div class="certificate-subtitle">подтверждает, что</div>
+            <div class="certificate-subtitle">ОБ ОКОНЧАНИИ КУРСА СВИДЕТЕЛЬСТВУЕТ, ЧТО</div>
         </div>
 
         <div class="certificate-body">
             <div class="student-name">{{ student_name }}</div>
 
-            <div class="course-label">успешно завершил(а) курс</div>
+            <div class="course-label">успешно завершил(-а) курс по программе</div>
             <div class="course-title">{{ course_title }}</div>
-
-            {% if group_name %}
-            <div class="certificate-label">Группа: {{ group_name }}</div>
-            {% endif %}
         </div>
 
         <div class="certificate-footer">
             <div class="footer-item">
-                <div class="footer-line">Подпись руководителя</div>
+                <div class="footer-text"><nobr>Худайбергенова П.Т.</nobr></div>
+                <div class="footer-line"></div>
+                <div class="footer-text"><nobr>Директор ИП MeMar</nobr></div>
             </div>
             <div class="footer-item">
-                <div class="footer-line">Печать</div>
+                <div class="footer-text"><nobr>№ {{ certificate_number }}</nobr></div>
+                <div class="footer-line"></div>
+                <div class="footer-text">
+                    <nobr>
+                        Дата выдачи:
+                        {% if from_dossier %}
+                            {{ completed_at|date:"d.m.Y" }}
+                        {% else %}
+                            {{ completed_at|date:"d.m.Y" }}
+                        {% endif %}
+                    </nobr>
+                </div>
             </div>
-        </div>
-
-        <div class="certificate-date">
-            Дата выдачи:
-            {% if from_dossier %}
-                {{ completed_at|date:"d.m.Y" }}
-            {% else %}
-                {{ completed_at|date:"d.m.Y" }}
-            {% endif %}
         </div>
 
         {% if with_stamp %}
@@ -47,7 +47,6 @@
             <div class="stamp">Подпись</div>
         {% endif %}
 
-        <div class="certificate-number">№ {{ certificate_number }}</div>
     </div>
 </body>
 </html>

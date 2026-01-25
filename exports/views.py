@@ -4,9 +4,11 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.shortcuts import get_object_or_404
+from django.contrib.admin.views.decorators import staff_member_required
+from datetime import date
 
 from quizzes.models import QuizAttempt
-from .services import QuizResultPDFService
+from .services import QuizResultPDFService, CertificatePDFService
 
 
 class QuizResultPDFView(APIView):
@@ -44,3 +46,33 @@ class QuizResultPDFView(APIView):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
 
         return response
+
+
+@staff_member_required
+def preview_certificate(request):
+    """
+    Превью сертификата для разработки.
+    Доступно только для staff пользователей.
+
+    GET /api/exports/preview/certificate/
+    GET /api/exports/preview/certificate/?stamp=1
+    """
+
+    class MockCertificate:
+        holder_name = 'Иванов Иван Иванович'
+        course_title = 'Оператор БПЛА. Базовый курс'
+        number = 'CERT-2025-001234'
+        issued_at = date.today()
+        group_name = 'Группа А-101'
+
+    with_stamp = request.GET.get('stamp') == '1'
+
+    service = CertificatePDFService()
+    pdf_bytes = service.generate_from_certificate(
+        MockCertificate(),
+        with_stamp=with_stamp
+    )
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="certificate_preview.pdf"'
+    return response
