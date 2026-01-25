@@ -1,7 +1,68 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from django.utils.text import slugify
+import re
 import uuid
+
+# === ТРАНСЛИТЕРАЦИЯ ===
+TRANSLIT_MAP = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+    'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+    # Казахские буквы
+    'ә': 'a', 'ғ': 'g', 'қ': 'q', 'ң': 'n', 'ө': 'o', 'ұ': 'u', 'ү': 'u',
+    'һ': 'h', 'і': 'i',
+}
+
+
+def transliterate(text: str) -> str:
+    """Транслитерация кириллицы в латиницу"""
+    result = []
+    for char in text.lower():
+        if char in TRANSLIT_MAP:
+            result.append(TRANSLIT_MAP[char])
+        elif char.isalnum() or char in ' -_':
+            result.append(char)
+    return ''.join(result)
+
+
+def make_slug(text: str, max_length: int = 50) -> str:
+    """Создаёт slug из текста с транслитерацией"""
+    # Транслитерация
+    text = transliterate(text)
+    # Заменяем пробелы и спецсимволы на дефисы
+    text = re.sub(r'[^a-z0-9]+', '-', text)
+    # Убираем дефисы в начале и конце
+    text = text.strip('-')
+    # Ограничиваем длину
+    return text[:max_length]
+
+
+def certificate_upload_path(instance, filename: str) -> str:
+    """
+    Генерирует путь для сертификата.
+
+    Структура: certificates/{year}/{course-slug}/{month}/{iin}_{filename}
+    Пример: certificates/2025/operator-bpla/01/123456789012_cert_KZ2025A1B2C3.pdf
+    """
+    from django.utils import timezone
+
+    now = timezone.now()
+    year = now.strftime('%Y')
+    month = now.strftime('%m')
+
+    # Slug курса
+    course_slug = make_slug(instance.course_title) or 'unknown-course'
+
+    # ИИН пользователя (добавляем в имя файла)
+    if instance.user and instance.user.iin:
+        iin = instance.user.iin
+        filename = f"{iin}_{filename}"
+
+    return f'certificates/{year}/{course_slug}/{month}/{filename}'
 
 
 class CertificateTemplate(models.Model):
@@ -223,14 +284,14 @@ class Certificate(models.Model):
     # === ФАЙЛЫ ===
     file_without_stamp = models.FileField(
         'Без печати',
-        upload_to='certificates/%Y/%m/',
+        upload_to=certificate_upload_path,
         null=True,
         blank=True
     )
 
     file_with_stamp = models.FileField(
         'С печатью',
-        upload_to='certificates/%Y/%m/',
+        upload_to=certificate_upload_path,
         null=True,
         blank=True
     )
