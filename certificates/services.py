@@ -18,10 +18,19 @@ class CertificateService:
         return ' '.join(parts) or user.email
 
     @classmethod
+    def certificate_exists(cls, user, course, certificate_type: str = 'certificate') -> bool:
+        """Проверить существует ли уже сертификат"""
+        return Certificate.objects.filter(
+            user=user,
+            course=course,
+            certificate_type=certificate_type
+        ).exists()
+
+    @classmethod
     def create_from_graduate(
-        cls,
-        graduate,
-        certificate_type: str = 'certificate'
+            cls,
+            graduate,
+            certificate_type: str = 'certificate'
     ) -> Certificate:
         """
         Создать сертификат из Graduate
@@ -32,7 +41,17 @@ class CertificateService:
 
         Returns:
             Certificate instance (status=pending)
+
+        Raises:
+            ValueError: если сертификат уже существует
         """
+        # Проверка на дубликат
+        if cls.certificate_exists(graduate.user, graduate.course, certificate_type):
+            raise ValueError(
+                f'Сертификат типа "{certificate_type}" для этого пользователя '
+                f'и курса уже существует'
+            )
+
         # Получаем шаблон курса
         template = cls._get_template(graduate.course)
 
@@ -50,6 +69,7 @@ class CertificateService:
             certificate_type=certificate_type,
             user=graduate.user,
             graduate=graduate,
+            course=graduate.course,
             number=Certificate.generate_number(),
             holder_name=cls._get_holder_name(graduate.user),
             course_title=template.full_course_title if template else graduate.course.title,
@@ -68,7 +88,7 @@ class CertificateService:
         return certificate
 
     @classmethod
-    def _get_template(cls, course) -> CertificateTemplate | None:
+    def _get_template(cls, course) -> 'CertificateTemplate | None':
         """Получить шаблон сертификата для курса"""
         try:
             return course.certificate_template

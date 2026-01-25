@@ -75,8 +75,8 @@ def preview_certificate(request):
         pass
 
     mock = MockCertificate()
-    mock.holder_name = 'Иванов Иван'
-    mock.course_title = 'Оператор беспилотных воздушных судов (БПЛА) мультироторного типа'
+    mock.holder_name = 'Киликаев Артём'
+    mock.course_title = 'Первоначальная теоретическая подготовка операторов БАС Категории 1'
     mock.number = 'KZ2025A1B2C3'
     mock.issued_at = date.today()
     mock.group_name = 'Группа А-101'

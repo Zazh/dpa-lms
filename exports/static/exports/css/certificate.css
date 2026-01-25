@@ -1,11 +1,3 @@
-/* Шрифты */
-@font-face {
-    font-family: 'CMU';
-    src: url('../fonts/cmun-400.ttf') format('truetype');
-    font-weight: 400;
-    font-style: normal;
-}
-
 @font-face {
     font-family: 'CMU';
     src: url('../fonts/cmun-500.ttf') format('truetype');
@@ -14,8 +6,22 @@
 }
 
 @font-face {
-    font-family: 'CMU';
-    src: url('../fonts/cmun-700.ttf') format('truetype');
+    font-family: 'Merriweather';
+    src: url('../fonts/Merriweather_400.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Merriweather';
+    src: url('../fonts/Merriweather_500.ttf') format('truetype');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Merriweather';
+    src: url('../fonts/Merriweather_700.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
 }
@@ -32,7 +38,7 @@
 }
 
 body {
-    font-family: 'CMU', serif;
+    font-family: 'Merriweather', serif;
     width: 297mm;
     height: 210mm;
     position: relative;
@@ -70,16 +76,16 @@ body {
     font-weight: 700;
     color: #bd8d45;
     text-transform: uppercase;
-    letter-spacing: -0.075em;
-    margin-bottom: 8mm;
+    letter-spacing: -0.025em;
+    margin-bottom: 9mm;
 }
 
 .certificate-subtitle {
-    font-size: 14.5pt;
-    font-weight: 500;
+    font-size: 14pt;
+    font-weight: 400;
     text-transform: uppercase;
     color: #000000;
-    letter-spacing: -0.02em;
+    letter-spacing: .15rem;
 
 }
 
@@ -89,31 +95,36 @@ body {
 }
 
 .student-name {
-    font-size: 28pt;
-    font-weight: 700;
+    font-size: 39pt;
+    font-weight: 500;
     color: #111827;
-    margin-bottom: 1mm;
-    padding-bottom: 3mm;
-    border-bottom: 2px solid #1e40af;
+    margin-bottom: .45mm;
+    font-family: 'CMU', serif;
+
+    /*border-bottom: 2px solid #1e40af;*/
     display: inline-block;
-    text-transform: uppercase;
+    text-transform: capitalize;
 }
 
 .course-label {
-    font-size: 19pt;
-    font-weight: 500;
+    font-size: 16pt;
+    font-weight: 400;
+    padding-top: 1mm;
+    /*color: red;*/
     color: #000000;
     margin-bottom: .25rem;
+    letter-spacing: .125rem;
 }
 
 .course-title {
-    font-size: 18pt;
-    font-weight: 700;
+    font-size: 16pt;
+    font-weight: 400;
+    /*color: red;*/
     color: #bd8d45;
     margin-bottom: 8mm;
-    padding: 0 20mm;
-    letter-spacing: -0.05em;
-    line-height: 1;
+    padding: .5mm 20mm 0;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
     height: 20mm;
 }
 
@@ -172,10 +183,9 @@ body {
     bottom: 20mm;
     right: 130mm;
 
-    width: 41mm;
-    height: 41mm;
+    width: 42mm;
+    height: 42mm;
 
-    /*border: 1px solid #000000;*/
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
@@ -205,7 +215,7 @@ body {
     background-image: url('../images/stamp.png');
 }
 .stamp-img-2 {
-    background-image: url('../images/stamp.png');
+    background-image: url('../images/stamp-mm.png');
 }
 .aft-img-1 {
     background-image: url('../images/aft.png');

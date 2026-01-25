@@ -225,6 +225,15 @@ class Certificate(models.Model):
         verbose_name='Выпуск'
     )
 
+    course = models.ForeignKey(
+        'content.Course',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='certificates',
+        verbose_name='Курс'
+    )
+
     # === ДАННЫЕ СЕРТИФИКАТА ===
     number = models.CharField(
         'Номер сертификата',
@@ -308,11 +317,20 @@ class Certificate(models.Model):
         verbose_name = 'Сертификат'
         verbose_name_plural = 'Сертификаты'
         ordering = ['-issued_at', '-created_at']
+        constraints = [
+            # Один сертификат на пользователя + курс + тип
+            models.UniqueConstraint(
+                fields=['user', 'course', 'certificate_type'],
+                name='unique_user_course_certificate_type',
+                condition=models.Q(user__isnull=False, course__isnull=False)
+            ),
+        ]
         indexes = [
             models.Index(fields=['number']),
             models.Index(fields=['source', 'status']),
             models.Index(fields=['-issued_at']),
             models.Index(fields=['certificate_type']),
+            models.Index(fields=['user', 'course']),
         ]
 
     def __str__(self):
