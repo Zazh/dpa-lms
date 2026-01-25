@@ -209,11 +209,23 @@ class CertificatePDFService:
             bytes: PDF документ
         """
         context = {
+            # Основные данные
             'student_name': certificate.holder_name,
             'course_title': certificate.course_title,
             'certificate_number': certificate.number,
             'completed_at': certificate.issued_at,
             'group_name': certificate.group_name,
+
+            # Новые поля из шаблона
+            'document_title': certificate.document_title,
+            'completion_text': certificate.completion_text,
+            'issue_date_label': certificate.issue_date_label,
+            'stamp_css_class': certificate.stamp_css_class,
+            'signature_css_class': certificate.signature_css_class,
+            'signer_name': certificate.signer_name,
+            'signer_position': certificate.signer_position,
+
+            # Флаг печати
             'with_stamp': with_stamp,
         }
 

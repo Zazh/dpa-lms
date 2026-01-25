@@ -52,26 +52,44 @@ class QuizResultPDFView(APIView):
 def preview_certificate(request):
     """
     Превью сертификата для разработки.
-    Доступно только для staff пользователей.
 
     GET /api/exports/preview/certificate/
     GET /api/exports/preview/certificate/?stamp=1
+    GET /api/exports/preview/certificate/?type=attended
     """
+    from datetime import date
+    from .services import CertificatePDFService
 
-    class MockCertificate:
-        holder_name = 'Иванов Иван Иванович'
-        course_title = 'Оператор БПЛА. Базовый курс'
-        number = 'CERT-2025-001234'
-        issued_at = date.today()
-        group_name = 'Группа А-101'
-
+    certificate_type = request.GET.get('type', 'certificate')
     with_stamp = request.GET.get('stamp') == '1'
 
+    # Определяем тексты в зависимости от типа
+    if certificate_type == 'attended':
+        document_title = 'СПРАВКА'
+        completion_text = 'прослушал(а) курс'
+    else:
+        document_title = 'СЕРТИФИКАТ'
+        completion_text = 'успешно завершил(а) курс'
+
+    class MockCertificate:
+        pass
+
+    mock = MockCertificate()
+    mock.holder_name = 'Иванов Иван'
+    mock.course_title = 'Оператор беспилотных воздушных судов (БПЛА) мультироторного типа'
+    mock.number = 'KZ2025A1B2C3'
+    mock.issued_at = date.today()
+    mock.group_name = 'Группа А-101'
+    mock.document_title = document_title
+    mock.completion_text = completion_text
+    mock.issue_date_label = 'Дата выдачи:'
+    mock.stamp_css_class = 'stamp-img-1'
+    mock.signature_css_class = 'aft-img-1'
+    mock.signer_name = 'Иванов И.И.'
+    mock.signer_position = 'Генеральный директор'
+
     service = CertificatePDFService()
-    pdf_bytes = service.generate_from_certificate(
-        MockCertificate(),
-        with_stamp=with_stamp
-    )
+    pdf_bytes = service.generate_from_certificate(mock, with_stamp=with_stamp)
 
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = 'inline; filename="certificate_preview.pdf"'

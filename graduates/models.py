@@ -248,16 +248,40 @@ class Graduate(models.Model):
 
         return True
 
-    def reject_graduation(self, manager, reason=''):
-        """Отклонить выпуск"""
-        if self.status == 'pending':
+    def reject_graduation(self, manager, create_attended_certificate: bool = True):
+        """
+        Отклонить выпуск (вызывается менеджером)
+
+        Args:
+            manager: User instance (менеджер)
+            create_attended_certificate: создать справку "Прослушал"
+        """
+        from django.db import transaction
+
+        if self.status != 'pending':
+            return False
+
+        with transaction.atomic():
             self.status = 'rejected'
+            self.graduated_at = timezone.now()
             self.graduated_by = manager
-            if reason:
-                self.notes = f"Отклонено: {reason}\n{self.notes}"
             self.save()
-            return True
-        return False
+
+            if create_attended_certificate:
+                # Создаём справку "Прослушал"
+                from certificates.services import CertificateService
+                certificate = CertificateService.create_from_graduate(
+                    self,
+                    certificate_type='attended'
+                )
+                self.certificate = certificate
+                self.save()
+
+                # Генерация PDF в фоне
+                from certificates.tasks import generate_certificate_pdf
+                generate_certificate_pdf.delay(certificate.id)
+
+        return True
 
     @classmethod
     def create_from_enrollment(cls, enrollment):

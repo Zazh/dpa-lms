@@ -4,7 +4,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, max_retries=3)
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=60,
+    retry_backoff_max=600,
+    retry_kwargs={'max_retries': 3}
+)
 def generate_certificate_pdf(self, certificate_id: int):
     """
     Генерация PDF сертификата в фоне
@@ -40,7 +46,13 @@ def generate_certificate_pdf(self, certificate_id: int):
         raise self.retry(exc=e, countdown=60)
 
 
-@shared_task(bind=True, max_retries=3)
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=30,           # начинаем с 30 сек (email быстрее восстанавливается)
+    retry_backoff_max=300,      # максимум 5 минут
+    retry_kwargs={'max_retries': 5}  # больше попыток для email
+)
 def send_certificate_email(self, certificate_id: int):
     """
     Отправка email с сертификатом

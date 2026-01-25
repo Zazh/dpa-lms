@@ -1,3 +1,5 @@
+{% load static %}
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -9,29 +11,29 @@
         <div class="certificate-border"></div>
 
         <div class="certificate-header">
-            <div class="certificate-title">Сертификат</div>
+            <div class="certificate-title">{{ document_title }}</div>
             <div class="certificate-subtitle">ОБ ОКОНЧАНИИ КУРСА СВИДЕТЕЛЬСТВУЕТ, ЧТО</div>
         </div>
 
         <div class="certificate-body">
             <div class="student-name">{{ student_name }}</div>
 
-            <div class="course-label">успешно завершил(-а) курс по программе</div>
-            <div class="course-title">{{ course_title }}</div>
+            <div class="course-label">{{ completion_text }} по программе</div>
+            <div class="course-title">"{{ course_title|safe }}"</div>
         </div>
 
         <div class="certificate-footer">
             <div class="footer-item">
-                <div class="footer-text"><nobr>Худайбергенова П.Т.</nobr></div>
+                <div class="footer-text"><nobr>{{ signer_name }}</nobr></div>
                 <div class="footer-line"></div>
-                <div class="footer-text"><nobr>Директор ИП MeMar</nobr></div>
+                <div class="footer-text"><nobr>{{ signer_position }}</nobr></div>
             </div>
             <div class="footer-item">
                 <div class="footer-text"><nobr>№ {{ certificate_number }}</nobr></div>
                 <div class="footer-line"></div>
                 <div class="footer-text">
                     <nobr>
-                        Дата выдачи:
+                        {{ issue_date_label }}
                         {% if from_dossier %}
                             {{ completed_at|date:"d.m.Y" }}
                         {% else %}
@@ -44,7 +46,8 @@
 
         {% if with_stamp %}
             <!-- Печать и подпись -->
-            <div class="stamp">Подпись</div>
+            <div class="stamp"></div>
+            <div class="aft"></div>
         {% endif %}
 
     </div>
