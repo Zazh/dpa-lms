@@ -286,17 +286,19 @@ def quiz_attempt_detail(request, attempt_id):
         id=attempt_id
     )
 
-    # Проверка доступа для обычного инструктора
     user = request.user
+
+    # Получаем enrollment студента для этого курса
+    enrollment = CourseEnrollment.objects.filter(
+        user=attempt.user,
+        course=attempt.quiz.lesson.module.course,
+    ).select_related('group').first()
+
+    # Проверка доступа для обычного инструктора
     if not user.is_super_instructor():
         accessible_groups = user.get_accessible_groups()
-        enrollment = CourseEnrollment.objects.filter(
-            user=attempt.user,
-            course=attempt.quiz.lesson.module.course,
-            group__in=accessible_groups
-        ).first()
 
-        if not enrollment:
+        if not enrollment or enrollment.group not in accessible_groups:
             messages.error(request, 'У вас нет доступа к этой попытке')
             return redirect('backoffice:quiz_attempts_list')
 
@@ -310,10 +312,10 @@ def quiz_attempt_detail(request, attempt_id):
         'attempt': attempt,
         'responses': responses,
         'passed': attempt.is_passed(),
+        'enrollment': enrollment,
     }
 
     return render(request, 'backoffice/quiz_attempt_detail.html', context)
-
 
 @instructor_required
 def assignments_check(request):

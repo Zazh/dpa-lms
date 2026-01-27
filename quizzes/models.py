@@ -307,7 +307,7 @@ class QuizResponse(models.Model):
 
     question = models.ForeignKey(
         QuizQuestion,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='responses',
         verbose_name='Вопрос'
     )

@@ -215,25 +215,25 @@
         </div>
         
         <!-- Действия -->
-        <!-- Действия -->
-<div class="bg-white shadow rounded-lg">
-    <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-base font-medium text-gray-900 mb-4">Действия</h3>
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-base font-medium text-gray-900 mb-4">Действия</h3>
 
-        <div class="space-y-3">
-            <a href="{% url 'backoffice:student_progress' attempt.user.id attempt.user.enrollments.first.group.id %}"
-               class="block w-full text-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                📊 Весь прогресс студента
-            </a>
+                <div class="space-y-3">
+                    {% if enrollment and enrollment.group %}
+                    <a href="{% url 'backoffice:student_progress' attempt.user.id enrollment.group.id %}"
+                       class="block w-full text-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        📊 Весь прогресс студента
+                    </a>
+                    {% endif %}
 
-            <a href="{% url 'backoffice:quiz_attempts_list' %}"
-               class="block w-full text-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                ← Назад к списку
-            </a>
+                    <a href="{% url 'backoffice:quiz_attempts_list' %}"
+                       class="block w-full text-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        ← Назад к списку
+                    </a>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
-        
     </div>
     
 </div>

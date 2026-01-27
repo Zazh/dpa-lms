@@ -1,6 +1,7 @@
 from content.models import Lesson
 from django.contrib import admin
 from django.utils.html import format_html
+from django.core.exceptions import PermissionDenied
 
 from .models import QuizLesson, QuizQuestion, QuizAnswer, QuizAttempt, QuizResponse
 
@@ -9,8 +10,29 @@ class QuizAnswerInline(admin.TabularInline):
     """Inline для вариантов ответов"""
     model = QuizAnswer
     extra = 2
-    fields = ['order', 'answer_text', 'is_correct']
+    fields = ['order', 'answer_text', 'is_correct', 'has_responses']
+    readonly_fields = ['has_responses']
     ordering = ['order']
+
+    def has_responses(self, obj):
+        """Показать есть ли ответы студентов"""
+        if not obj.pk:
+            return '-'
+        count = obj.selected_by.count()
+        if count > 0:
+            return format_html(
+                '<span style="color: red;">🔒 {} ответов</span>',
+                count
+            )
+        return '✅ Можно удалить'
+
+    has_responses.short_description = 'Использован'
+
+    def has_delete_permission(self, request, obj=None):
+        """Запретить удаление если есть ответы студентов"""
+        if obj and obj.selected_by.exists():
+            return False
+        return super().has_delete_permission(request, obj)
 
 
 @admin.register(QuizQuestion)
@@ -238,7 +260,7 @@ class QuizAttemptAdmin(admin.ModelAdmin):
 
 @admin.register(QuizAnswer)
 class QuizAnswerAdmin(admin.ModelAdmin):
-    list_display = ['answer_text_short', 'question_short', 'is_correct_badge', 'order']
+    list_display = ['answer_text_short', 'question_short', 'is_correct_badge', 'order', 'responses_count']
     list_filter = ['is_correct', 'question__quiz__lesson__module__course']
     search_fields = ['answer_text', 'question__question_text']
 
@@ -259,6 +281,29 @@ class QuizAnswerAdmin(admin.ModelAdmin):
         return format_html('<span style="color: #dc3545;">❌ Неправильный</span>')
 
     is_correct_badge.short_description = 'Правильность'
+
+    def responses_count(self, obj):
+        count = obj.selected_by.count()
+        if count > 0:
+            return format_html('<span style="color: red;">🔒 {}</span>', count)
+        return '✅ 0'
+
+    responses_count.short_description = 'Выбран студентами'
+
+    def delete_model(self, request, obj):
+        if obj.selected_by.exists():
+            raise PermissionDenied(
+                'Нельзя удалить вариант ответа — его выбирали студенты'
+            )
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        for obj in queryset:
+            if obj.selected_by.exists():
+                raise PermissionDenied(
+                    f'Нельзя удалить "{obj.answer_text[:30]}..." — его выбирали студенты'
+                )
+        super().delete_queryset(request, queryset)
 
 
 @admin.register(QuizResponse)
