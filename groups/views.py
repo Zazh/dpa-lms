@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
+from django.db import IntegrityError
 from .models import Group
 from progress.models import CourseEnrollment
 
@@ -105,13 +106,23 @@ class JoinGroupByTokenView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Создаем зачисление на курс
-        enrollment = CourseEnrollment.objects.create(
-            user=request.user,
-            course=group.course,
-            group=group,
-            is_active=True
-        )
+        # Создаем зачисление на курс (с защитой от race condition)
+        try:
+            enrollment = CourseEnrollment.objects.create(
+                user=request.user,
+                course=group.course,
+                group=group,
+                is_active=True
+            )
+        except IntegrityError:
+            # Enrollment уже существует — получаем и обновляем
+            enrollment = CourseEnrollment.objects.get(
+                user=request.user,
+                course=group.course
+            )
+            enrollment.group = group
+            enrollment.is_active = True
+            enrollment.save(update_fields=['group', 'is_active'])
 
         # Инициализируем прогресс для всех уроков
         from content.models import Lesson
@@ -120,13 +131,10 @@ class JoinGroupByTokenView(APIView):
         lessons = Lesson.objects.filter(module__course=group.course).order_by('module__order', 'order')
 
         for lesson in lessons:
-            # Используем get_or_create на случай если прогресс уже был создан
-            progress, created = LessonProgress.objects.get_or_create(
+            # Используем безопасный метод
+            progress, created = LessonProgress.get_or_create_safe(
                 user=request.user,
-                lesson=lesson,
-                defaults={
-                    'is_completed': False
-                }
+                lesson=lesson
             )
             # Рассчитываем доступность урока только для новых записей
             if created:

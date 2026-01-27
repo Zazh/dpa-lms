@@ -231,18 +231,41 @@ def grade_assignment(request, submission_id):
         "feedback": "Хорошая работа!"
     }
     """
-    print(f"🟢 grade_assignment: START submission_id={submission_id}")  # ← ДОБАВИТЬ
+    print(f"🟢 grade_assignment: START submission_id={submission_id}")
 
     submission = get_object_or_404(AssignmentSubmission, id=submission_id)
-    print(f"🟢 Найдена сдача: {submission}")  # ← ДОБАВИТЬ
+    print(f"🟢 Найдена сдача: {submission}")
 
-    # TODO: Добавьте проверку прав (только преподаватель курса может оценивать)
-    # if not request.user.is_instructor_of_course(submission.assignment.lesson.module.course):
-    #     return Response({'error': 'Нет прав'}, status=status.HTTP_403_FORBIDDEN)
+    # ✅ Проверка прав: только инструктор курса может оценивать
+    user = request.user
+
+    # 1. Проверяем что пользователь — инструктор
+    if not user.is_instructor():
+        return Response(
+            {'error': 'Только инструкторы могут оценивать задания'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # 2. Если не супер-инструктор — проверяем доступ к группе студента
+    if not user.is_super_instructor():
+        from progress.models import CourseEnrollment
+
+        accessible_groups = user.get_accessible_groups()
+        enrollment = CourseEnrollment.objects.filter(
+            user=submission.user,
+            course=submission.assignment.lesson.module.course,
+            group__in=accessible_groups
+        ).first()
+
+        if not enrollment:
+            return Response(
+                {'error': 'У вас нет доступа к этой работе'},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
     # Валидация
     status_value = request.data.get('status')
-    print(f"🟢 status_value: {status_value}")  # ← ДОБАВИТЬ
+    print(f"🟢 status_value: {status_value}")
 
     if status_value not in ['passed', 'needs_revision', 'failed']:
         return Response(
@@ -252,7 +275,7 @@ def grade_assignment(request, submission_id):
 
     feedback = request.data.get('feedback', '')
     score = request.data.get('score')
-    print(f"🟢 score: {score}, feedback: {feedback[:50] if feedback else 'нет'}")  # ← ДОБАВИТЬ
+    print(f"🟢 score: {score}, feedback: {feedback[:50] if feedback else 'нет'}")
 
     # Применяем оценку
     if status_value == 'passed':
@@ -261,25 +284,25 @@ def grade_assignment(request, submission_id):
                 {'error': 'Укажите балл'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        print(f"🟢 Вызываем mark_passed()")  # ← ДОБАВИТЬ
+        print(f"🟢 Вызываем mark_passed()")
         submission.mark_passed(request.user, score, feedback)
-        print(f"🟢 mark_passed() завершен")  # ← ДОБАВИТЬ
+        print(f"🟢 mark_passed() завершен")
         message = 'Работа зачтена'
 
     elif status_value == 'needs_revision':
-        print(f"🟢 Вызываем mark_needs_revision()")  # ← ДОБАВИТЬ
+        print(f"🟢 Вызываем mark_needs_revision()")
         submission.mark_needs_revision(request.user, feedback)
-        print(f"🟢 mark_needs_revision() завершен")  # ← ДОБАВИТЬ
+        print(f"🟢 mark_needs_revision() завершен")
         message = 'Отправлено на доработку'
 
     else:  # failed
         score = score or 0
-        print(f"🟢 Вызываем mark_failed()")  # ← ДОБАВИТЬ
+        print(f"🟢 Вызываем mark_failed()")
         submission.mark_failed(request.user, feedback, score)
-        print(f"🟢 mark_failed() завершен")  # ← ДОБАВИТЬ
+        print(f"🟢 mark_failed() завершен")
         message = 'Работа не зачтена'
 
-    print(f"🟢 grade_assignment: END")  # ← ДОБАВИТЬ
+    print(f"🟢 grade_assignment: END")
 
     return Response({
         'success': True,

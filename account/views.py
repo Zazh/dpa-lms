@@ -9,6 +9,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.db import IntegrityError
 
 from notifications.services import EmailService
 from .models import EmailVerificationToken, PasswordResetToken, EgovAuthSession
@@ -150,7 +151,7 @@ class SetPasswordView(APIView):
         token.is_used = True
         token.save()
 
-        # ← ДОБАВИТЬ: Отправляем уведомление о завершении регистрации
+        # Отправляем уведомление о завершении регистрации
         from notifications.services import NotificationService
         NotificationService.notify_registration_completed(user)
 
@@ -171,22 +172,32 @@ class SetPasswordView(APIView):
 
                     if success:
                         # Создаем зачисление
-                        enrollment = CourseEnrollment.objects.create(
-                            user=user,
-                            course=group.course,
-                            group=group,
-                            is_active=True
-                        )
+                        try:
+                            enrollment = CourseEnrollment.objects.create(
+                                user=user,
+                                course=group.course,
+                                group=group,
+                                is_active=True
+                            )
+                        except IntegrityError:
+                            # Enrollment уже существует — получаем и обновляем
+                            enrollment = CourseEnrollment.objects.get(
+                                user=user,
+                                course=group.course
+                            )
+                            enrollment.group = group
+                            enrollment.is_active = True
+                            enrollment.save(update_fields=['group', 'is_active'])
 
                         # Инициализируем прогресс
                         lessons = Lesson.objects.filter(module__course=group.course).order_by('module__order', 'order')
                         for lesson in lessons:
-                            progress = LessonProgress.objects.create(
+                            progress, created = LessonProgress.get_or_create_safe(
                                 user=user,
-                                lesson=lesson,
-                                is_completed=False
+                                lesson=lesson
                             )
-                            progress.calculate_available_at()
+                            if created:
+                                progress.calculate_available_at()
 
                         enrollment_info = {
                             'course': group.course.title,

@@ -258,7 +258,6 @@ class AssignmentSubmission(models.Model):
 
     def is_late(self):
         """Проверка, сдано ли после дедлайна"""
-        # TODO: Реализовать после создания LessonProgress
         return False
 
     def get_comments_count(self):

@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.db.models import Count, Q
 from content.models import Course, Lesson, Module, VideoLesson
 from groups.models import Group
+from django.db import IntegrityError
 
 
 class CourseEnrollment(models.Model):
@@ -260,6 +261,26 @@ class LessonProgress(models.Model):
         status = '✅' if self.is_completed else '⏳'
         return f"{status} {self.user.get_full_name()} - {self.lesson.title}"
 
+    @classmethod
+    def get_or_create_safe(cls, user, lesson, **defaults):
+        """
+        Безопасное создание прогресса с защитой от race condition.
+        Используй вместо get_or_create во всех местах.
+        """
+        from django.db import IntegrityError
+
+        try:
+            obj, created = cls.objects.get_or_create(
+                user=user,
+                lesson=lesson,
+                defaults=defaults or {'is_completed': False}
+            )
+            return obj, created
+        except IntegrityError:
+            # Запись создана другим процессом — получаем её
+            obj = cls.objects.get(user=user, lesson=lesson)
+            return obj, False
+
     def mark_completed(self, completion_data=None):
         """Отметить урок как завершенный"""
         if not self.is_completed:
@@ -280,13 +301,13 @@ class LessonProgress(models.Model):
                 enrollment.calculate_progress()
                 enrollment.update_last_activity()
 
-                # НОВОЕ: Пересчитать available_at для следующего урока
+                # Пересчитать available_at для следующего урока
                 next_lesson = self._get_next_lesson()
                 if next_lesson:
-                    next_progress, created = LessonProgress.objects.get_or_create(
+                    # ✅ Используем безопасный метод вместо try/except
+                    next_progress, created = LessonProgress.get_or_create_safe(
                         user=self.user,
-                        lesson=next_lesson,
-                        defaults={'is_completed': False}
+                        lesson=next_lesson
                     )
                     next_progress.calculate_available_at()
 
@@ -298,27 +319,23 @@ class LessonProgress(models.Model):
                             lesson=next_lesson
                         )
 
-                # ✅ ЛОГИКА ВЫПУСКНИКОВ: Если достигнут 100% прогресс
+                # ЛОГИКА ВЫПУСКНИКОВ: Если достигнут 100% прогресс
                 if enrollment.progress_percentage >= 100:
                     from graduates.models import Graduate
+                    from django.db import IntegrityError
 
-                    # Создаем выпускника (статус pending)
-                    graduate = Graduate.create_from_enrollment(enrollment)
+                    try:
+                        graduate = Graduate.create_from_enrollment(enrollment)
 
-                    if graduate:
-                        # ⚠️ НЕ удаляем из группы сразу!
-                        # Менеджер должен видеть группу при подтверждении выпуска
+                        if graduate:
+                            enrollment.is_active = False
+                            enrollment.save()
 
-                        # Деактивируем зачисление (доступ закрыт)
-                        enrollment.is_active = False
-                        enrollment.save()
-
-                        # TODO: Отправить уведомление студенту о завершении
-                        # from notifications.services import EmailService
-                        # EmailService.send_completion_notification(self.user, enrollment.course)
-
-                        print(f"🎓 Студент {self.user.email} завершил курс {enrollment.course.title}!")
-                        print(f"   Создан Graduate ID: {graduate.id} (статус: pending)")
+                            print(f"🎓 Студент {self.user.email} завершил курс {enrollment.course.title}!")
+                            print(f"   Создан Graduate ID: {graduate.id} (статус: pending)")
+                    except IntegrityError:
+                        # Graduate уже создан другим процессом — ок
+                        pass
 
             except CourseEnrollment.DoesNotExist:
                 pass
