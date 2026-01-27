@@ -1,4 +1,6 @@
 import logging
+import uuid
+
 
 from django.contrib.auth import authenticate, get_user_model
 from drf_spectacular.utils import extend_schema
@@ -326,6 +328,7 @@ class UserProfileView(APIView):
             'user': UserSerializer(request.user).data
         })
 
+
 @extend_schema(
     tags=['eGov Auth'],
     summary='Инициализация eGov авторизации',
@@ -343,16 +346,19 @@ class EgovInitView(APIView):
     )
     def post(self, request):
         try:
-            # Сначала создаём сессию чтобы получить ID
+            # Генерируем уникальный временный qr_id
+            temp_qr_id = f"temp_{uuid.uuid4().hex}"
+
+            # Создаём сессию с уникальным временным значением
             session = EgovAuthSession.objects.create(
-                qr_id='pending',  # временное значение
+                qr_id=temp_qr_id,
                 status='pending'
             )
 
             # Вызываем сервис с ID сессии
             result = SigexAuthService.init_qr_signing(session.id)
 
-            # Обновляем qr_id
+            # Обновляем qr_id на реальный от Sigex
             session.qr_id = result['qr_id']
             session.save()
 
@@ -369,8 +375,11 @@ class EgovInitView(APIView):
 
         except Exception as e:
             logger.error(f'EgovInitView error: {e}')
+            # Удаляем сессию если была создана но произошла ошибка
+            if 'session' in locals():
+                session.delete()
             return Response(
-                {'error': str(e)},
+                {'error': 'Ошибка инициализации eGov авторизации'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

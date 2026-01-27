@@ -445,11 +445,10 @@ class EmailService:
         course_title = certificate.course_title
 
         text_content = f"""
-    🎓 ПОЗДРАВЛЯЕМ С ВЫПУСКОМ!
 
     Здравствуйте, {user.first_name}!
 
-    Мы рады сообщить, что вы успешно завершили обучение!
+    Поздравляем вас с успешным завершением курса!
 
     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     📚 Курс: {course_title}
