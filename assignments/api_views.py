@@ -1,21 +1,19 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
-from django.shortcuts import get_object_or_404
-from django.db import transaction
 
+from progress.models import LessonProgress
 from .models import AssignmentLesson, AssignmentSubmission, AssignmentComment
 from .serializers import (
-    AssignmentLessonDetailSerializer,
     AssignmentSubmissionSerializer,
     AssignmentSubmissionDetailSerializer,
     AssignmentSubmitSerializer,
     CommentCreateSerializer,
     AssignmentCommentSerializer  # ← ДОБАВЛЕНО
 )
-from progress.models import LessonProgress
 
 
 @api_view(['POST'])

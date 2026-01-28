@@ -1,23 +1,20 @@
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from django.db import transaction
-from drf_spectacular.utils import extend_schema, OpenApiParameter
 
+from progress.models import LessonProgress
 from .models import QuizLesson, QuizAttempt, QuizResponse, QuizQuestion
 from .serializers import (
     QuizLessonDetailSerializer,
     QuizSubmitSerializer,
-    QuizResultSerializer,
     QuizQuestionWithCorrectSerializer,
     QuizAttemptSerializer,
     QuizAnswerWithCorrectSerializer
 )
-from progress.models import LessonProgress
-
 
 
 def _format_available_in(available_at):

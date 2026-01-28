@@ -1,13 +1,12 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
-from django.conf import settings
 from django.utils import timezone
-from django.db.models import Count, Q
+
 from content.models import Course, Lesson, Module, VideoLesson
 from groups.models import Group
-from django.db import IntegrityError
 
 
 class CourseEnrollment(models.Model):

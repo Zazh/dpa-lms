@@ -1,9 +1,8 @@
-from django.db import models
-from django.conf import settings
-from django.utils import timezone
-from django.utils.text import slugify
 import re
 import uuid
+
+from django.db import models
+from django.utils import timezone
 
 # === ТРАНСЛИТЕРАЦИЯ ===
 TRANSLIT_MAP = {

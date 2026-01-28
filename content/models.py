@@ -1,11 +1,12 @@
-from django.db import models
-from django.conf import settings
-from django.core.validators import MinValueValidator, MaxValueValidator
-from django.utils import timezone
-from PIL import Image
-from io import BytesIO
-from django.core.files.uploadedfile import InMemoryUploadedFile
 import sys
+from io import BytesIO
+
+from PIL import Image
+from django.conf import settings
+from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db import models
+
 
 class Course(models.Model):
     """Курс обучения"""

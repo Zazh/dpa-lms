@@ -1,8 +1,9 @@
-from rest_framework import serializers
-from .models import CourseEnrollment, LessonProgress, VideoProgress
-from content.models import Lesson, Module, VideoLesson
+from django.db.models import Prefetch
 from django.utils import timezone
-from django.db.models import Prefetch, Count, Q
+from rest_framework import serializers
+
+from content.models import Lesson, Module, VideoLesson
+from .models import CourseEnrollment, LessonProgress, VideoProgress
 
 
 class VideoProgressSerializer(serializers.ModelSerializer):

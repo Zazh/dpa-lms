@@ -1,8 +1,9 @@
-from django.db import models
-from django.conf import settings
-from django.core.validators import MinValueValidator
 import uuid
+
+from django.conf import settings
+from django.db import models
 from django.utils import timezone
+
 from content.models import Course
 
 

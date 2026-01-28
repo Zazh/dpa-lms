@@ -1,7 +1,6 @@
 import logging
 import uuid
 
-
 from django.contrib.auth import authenticate, get_user_model
 from drf_spectacular.utils import extend_schema
 from rest_framework import status

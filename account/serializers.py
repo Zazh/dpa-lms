@@ -1,8 +1,8 @@
 import re
-from rest_framework import serializers
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from .models import EmailVerificationToken, PasswordResetToken, EgovAuthSession
+from rest_framework import serializers
 
 User = get_user_model()
 

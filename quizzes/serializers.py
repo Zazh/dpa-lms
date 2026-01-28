@@ -1,6 +1,8 @@
-from rest_framework import serializers
-from .models import QuizLesson, QuizQuestion, QuizAnswer, QuizAttempt, QuizResponse
 import random
+
+from rest_framework import serializers
+
+from .models import QuizLesson, QuizQuestion, QuizAnswer, QuizAttempt
 
 
 class QuizAnswerSerializer(serializers.ModelSerializer):
