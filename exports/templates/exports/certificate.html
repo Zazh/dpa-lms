@@ -11,12 +11,12 @@
         <div class="certificate-border"></div>
 
         <div class="certificate-header">
-            <div class="certificate-title">{{ document_title }}</div>
+            <div class="certificate-title" style="visibility: hidden">{{ document_title }}</div>
             <div class="certificate-subtitle">ОБ ОКОНЧАНИИ КУРСА СВИДЕТЕЛЬСТВУЕТ, ЧТО</div>
         </div>
 
         <div class="certificate-body">
-            <div class="student-name">{{ student_name }}</div>
+            <div class="student-name">{{ student_name|title }}</div>
 
             <div class="course-label">{{ completion_text }} по программе</div>
             <div class="course-title">"{{ course_title|safe }}"</div>

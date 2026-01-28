@@ -68,7 +68,7 @@ body {
     text-align: center;
     /* Отступ сверху - подбери по макету */
     padding-top: 44mm;
-    margin-bottom: 10mm;
+    margin-bottom: 9mm;
 }
 
 .certificate-title {
@@ -85,7 +85,7 @@ body {
     font-weight: 400;
     text-transform: uppercase;
     color: #000000;
-    letter-spacing: .15rem;
+    letter-spacing: 1px;
 
 }
 
@@ -107,23 +107,23 @@ body {
 }
 
 .course-label {
-    font-size: 16pt;
+    font-size: 15pt;
     font-weight: 400;
     padding-top: 1mm;
     /*color: red;*/
     color: #000000;
     margin-bottom: .25rem;
-    letter-spacing: .125rem;
+    letter-spacing: 2px;
 }
 
 .course-title {
-    font-size: 16pt;
+    font-size: 15pt;
     font-weight: 400;
     /*color: red;*/
     color: #bd8d45;
     margin-bottom: 8mm;
     padding: .5mm 20mm 0;
-    letter-spacing: -0.5px;
+    letter-spacing: 2px;
     line-height: 1.2;
     height: 20mm;
 }
@@ -149,7 +149,8 @@ body {
 }
 .footer-text {
     font-size: 14pt;
-    font-weight: bold;
+    font-weight: 500;
+    letter-spacing: 1px;
 }
 
 .footer-line {
