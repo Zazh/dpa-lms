@@ -37,13 +37,13 @@
                            class="{% if request.resolver_match.url_name == 'groups_list' or request.resolver_match.url_name == 'group_detail' or request.resolver_match.url_name == 'student_progress' %}border-indigo-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             Группы
                         </a>
-                        <a href="{% url 'backoffice:graduates_list' %}"
-                           class="{% if request.resolver_match.url_name == 'graduates_list' or request.resolver_match.url_name == 'graduate_detail' %}border-indigo-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            Выпускники
-                        </a>
                         {% endif %}
 
                         {% if user.is_super_instructor or user.is_super_manager %}
+                        <a href="{% url 'backoffice:graduates_list' %}"
+                            class="{% if request.resolver_match.url_name == 'graduates_list' or request.resolver_match.url_name == 'graduate_detail' %}border-indigo-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                            Выпускники
+                        </a>
                         <a href="{% url 'backoffice:student_dossiers_list' %}"
                            class="{% if 'dossier' in request.path %}border-indigo-500 text-gray-900{% else %}border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700{% endif %} inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                             📋 Досье

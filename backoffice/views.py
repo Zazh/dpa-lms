@@ -366,6 +366,11 @@ def graduates_list(request):
 
     user = request.user
 
+    # Проверка доступа - только супер-инструктор и менеджеры
+    if not (user.is_super_instructor() or user.is_manager() or user.is_super_manager()):
+        messages.error(request, 'Доступ к выпускникам только для супер-инструкторов и менеджеров')
+        return redirect('backoffice:dashboard')
+
     # Фильтры
     status_filter = request.GET.get('status', 'pending')
     group_filter = request.GET.get('group', '')
@@ -378,12 +383,6 @@ def graduates_list(request):
         'group',
         'graduated_by'
     )
-
-    # Фильтр по группам для обычного инструктора
-    if not user.is_super_instructor() and not user.is_manager():
-        accessible_groups = user.get_accessible_groups()
-        if accessible_groups.exists():
-            graduates = graduates.filter(group__in=accessible_groups)
 
     # Применяем фильтры
     if status_filter:
@@ -399,10 +398,6 @@ def graduates_list(request):
 
     # Статистика
     all_graduates = Graduate.objects.all()
-    if not user.is_super_instructor() and not user.is_manager():
-        accessible_groups = user.get_accessible_groups()
-        if accessible_groups.exists():
-            all_graduates = all_graduates.filter(group__in=accessible_groups)
 
     stats = {
         'pending': all_graduates.filter(status='pending').count(),
@@ -427,7 +422,6 @@ def graduates_list(request):
 
     return render(request, 'backoffice/graduates_list.html', context)
 
-
 @backoffice_required
 def graduate_detail(request, graduate_id):
     """Детали выпускника"""
@@ -436,11 +430,11 @@ def graduate_detail(request, graduate_id):
 
     # Проверка доступа
     user = request.user
-    if not user.is_super_instructor() and not user.is_manager():
-        accessible_groups = user.get_accessible_groups()
-        if graduate.group not in accessible_groups:
-            messages.error(request, 'У вас нет доступа к этому выпускнику')
-            return redirect('backoffice:graduates_list')
+
+    # Проверка доступа - только супер-инструктор и менеджеры
+    if not (user.is_super_instructor() or user.is_manager() or user.is_super_manager()):
+        messages.error(request, 'Доступ к выпускникам только для супер-инструкторов и менеджеров')
+        return redirect('backoffice:dashboard')
 
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -492,9 +486,10 @@ def graduates_bulk_action(request):
 
     # Проверка доступа
     user = request.user
-    if not user.is_super_instructor() and not user.is_manager():
-        accessible_groups = user.get_accessible_groups()
-        graduates = graduates.filter(group__in=accessible_groups)
+    # Проверка доступа - только супер-инструктор и менеджеры
+    if not (user.is_super_instructor() or user.is_manager() or user.is_super_manager()):
+        messages.error(request, 'Доступ к выпускникам только для супер-инструкторов и менеджеров')
+        return redirect('backoffice:dashboard')
 
     if action == 'approve':
         # Массовый выпуск
