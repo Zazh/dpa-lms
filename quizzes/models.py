@@ -29,10 +29,10 @@ class QuizLesson(models.Model):
         help_text='0 = неограниченно'
     )
 
-    retry_delay_hours = models.PositiveIntegerField(
-        'Задержка между попытками (часы)',
+    retry_delay_minutes = models.PositiveIntegerField(
+        'Задержка между попытками (минуты)',
         default=0,
-        help_text='Сколько часов ждать между попытками'
+        help_text='Сколько минут ждать между попытками (0 = без задержки)'
     )
 
     time_limit_minutes = models.PositiveIntegerField(
@@ -89,15 +89,23 @@ class QuizLesson(models.Model):
             if attempts.count() >= self.max_attempts:
                 return False, 'Исчерпан лимит попыток'
 
-        # Проверка задержки между попытками
-        if self.retry_delay_hours > 0 and attempts.exists():
+        # Проверка задержки между попытками (теперь в минутах!)
+        if self.retry_delay_minutes > 0 and attempts.exists():
             last_attempt = attempts.first()
             if last_attempt.completed_at:
                 time_since_last = timezone.now() - last_attempt.completed_at
-                required_delay = timezone.timedelta(hours=self.retry_delay_hours)
+                required_delay = timezone.timedelta(minutes=self.retry_delay_minutes)
                 if time_since_last < required_delay:
-                    hours_left = (required_delay - time_since_last).total_seconds() / 3600
-                    return False, f'Подождите {hours_left:.1f} часов'
+                    remaining_seconds = (required_delay - time_since_last).total_seconds()
+                    remaining_minutes = int(remaining_seconds // 60)
+
+                    if remaining_minutes >= 60:
+                        hours = remaining_minutes // 60
+                        mins = remaining_minutes % 60
+                        if mins > 0:
+                            return False, f'Подождите {hours} ч. {mins} мин.'
+                        return False, f'Подождите {hours} ч.'
+                    return False, f'Подождите {remaining_minutes} мин.'
 
         return True, 'OK'
 

@@ -86,7 +86,7 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
             'id',
             'passing_score',
             'max_attempts',
-            'retry_delay_hours',
+            'retry_delay_minutes',
             'time_limit_minutes',
             'show_correct_answers',
             'questions_count',
@@ -153,30 +153,32 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
             return {'allowed': False, 'message': 'Не авторизован'}
 
         user = request.user
-
-        # Используем prefetch если есть
         user_attempts = getattr(obj, 'user_attempts_list', None)
 
         if user_attempts is not None:
-            # Логика проверки из prefetch
             attempts_count = len(user_attempts)
 
             if obj.max_attempts and attempts_count >= obj.max_attempts:
                 return {'allowed': False, 'message': f'Достигнут лимит попыток ({obj.max_attempts})'}
 
-            # Проверка задержки между попытками
-            if obj.retry_delay_hours and user_attempts:
+            # Проверка задержки между попытками (ТЕПЕРЬ В МИНУТАХ!)
+            if obj.retry_delay_minutes and user_attempts:
                 from django.utils import timezone
                 last_attempt = max(user_attempts, key=lambda a: a.started_at)
-                if last_attempt.status == 'completed':
+                if last_attempt.status == 'completed' and last_attempt.completed_at:
                     time_since = timezone.now() - last_attempt.completed_at
-                    hours_passed = time_since.total_seconds() / 3600
-                    if hours_passed < obj.retry_delay_hours:
-                        remaining = obj.retry_delay_hours - hours_passed
-                        return {
-                            'allowed': False,
-                            'message': f'Повторная попытка доступна через {int(remaining)} ч.'
-                        }
+                    minutes_passed = time_since.total_seconds() / 60
+                    if minutes_passed < obj.retry_delay_minutes:
+                        remaining = int(obj.retry_delay_minutes - minutes_passed)
+
+                        if remaining >= 60:
+                            hours = remaining // 60
+                            mins = remaining % 60
+                            if mins > 0:
+                                return {'allowed': False,
+                                        'message': f'Повторная попытка доступна через {hours} ч. {mins} мин.'}
+                            return {'allowed': False, 'message': f'Повторная попытка доступна через {hours} ч.'}
+                        return {'allowed': False, 'message': f'Повторная попытка доступна через {remaining} мин.'}
 
             return {'allowed': True, 'message': 'Можно начать тест'}
 

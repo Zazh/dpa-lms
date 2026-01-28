@@ -172,6 +172,12 @@ REST_FRAMEWORK = {
 # CORS Settings
 CORS_ALLOW_ALL_ORIGINS = True
 
+# CSRF Settings
+CSRF_TRUSTED_ORIGINS = [
+    'https://dpa.aerialsolutions.kz',
+    'http://localhost:3000',
+    'http://localhost:8007',
+]
 # Email settings
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
