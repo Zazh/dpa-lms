@@ -68,7 +68,7 @@ body {
     text-align: center;
     /* Отступ сверху - подбери по макету */
     padding-top: 44mm;
-    margin-bottom: 9mm;
+    margin-bottom: 4mm;
 }
 
 .certificate-title {
@@ -109,7 +109,7 @@ body {
 .course-label {
     font-size: 15pt;
     font-weight: 400;
-    padding-top: 1mm;
+    padding-top: 6mm;
     /*color: red;*/
     color: #000000;
     margin-bottom: .25rem;
