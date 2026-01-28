@@ -68,14 +68,14 @@ def preview_certificate(request):
         completion_text = 'прослушал(а) курс'
     else:
         document_title = 'СЕРТИФИКАТ'
-        completion_text = 'успешно завершил(а) курс'
+        completion_text = 'успешно завершил(–а) курс'
 
     class MockCertificate:
         pass
 
     mock = MockCertificate()
-    mock.holder_name = 'КИЛИКАЕВ АРТЕМ'
-    mock.course_title = 'Первоначальная теоретическая подготовка операторов БАС Категории 1'
+    mock.holder_name = 'Алдакуатов Елдос'
+    mock.course_title = 'Первоначальная теоретическая подготовка операторов БАС Категории 2'
     mock.number = 'KZ2025A1B2C3'
     mock.issued_at = date.today()
     mock.group_name = 'Группа А-101'
@@ -84,8 +84,8 @@ def preview_certificate(request):
     mock.issue_date_label = 'Дата выдачи:'
     mock.stamp_css_class = 'stamp-img-1'
     mock.signature_css_class = 'aft-img-1'
-    mock.signer_name = 'Иванов И.И.'
-    mock.signer_position = 'Генеральный директор'
+    mock.signer_name = 'Худайбергенова П.Т.'
+    mock.signer_position = 'Генеральный директор<br>ТОО "Aerial Solutions"'
 
     service = CertificatePDFService()
     pdf_bytes = service.generate_from_certificate(mock, with_stamp=with_stamp)
