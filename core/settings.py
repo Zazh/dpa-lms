@@ -233,16 +233,20 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
-# DEBUG TOOLS (только для разработки)
-if DEBUG:
-    # Django Silk - профилирование запросов
+# Django Silk - профилирование запросов
+SILK_ENABLED = config('SILK_ENABLED', default=False, cast=bool)
+
+if SILK_ENABLED:
     INSTALLED_APPS += ['silk']
     MIDDLEWARE.insert(0, 'silk.middleware.SilkyMiddleware')
 
     SILKY_PYTHON_PROFILER = True
     SILKY_META = True
-    SILKY_MAX_RECORDED_REQUESTS = 1000  # Лимит хранимых запросов
+    SILKY_MAX_RECORDED_REQUESTS = 500
     SILKY_MAX_RECORDED_REQUESTS_CHECK_PERCENT = 10
+    # Аутентификация для доступа к Silk
+    SILKY_AUTHENTICATION = True
+    SILKY_AUTHORISATION = True  # Только superuser
 
 # Logging Configuration
 LOGGING = {
