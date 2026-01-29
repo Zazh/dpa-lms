@@ -5,6 +5,7 @@ from .models import Graduate
 class GraduateSerializer(serializers.ModelSerializer):
     """Информация о выпуске"""
 
+    course_id = serializers.IntegerField(source='course.id', read_only=True)
     course_title = serializers.CharField(source='course.title', read_only=True)
     course_label = serializers.CharField(source='course.label', read_only=True)
     group_name = serializers.CharField(source='group.name', read_only=True)
@@ -17,6 +18,7 @@ class GraduateSerializer(serializers.ModelSerializer):
         model = Graduate
         fields = [
             'id',
+            'course_id',
             'status',
             'status_display',
             'course_title',
