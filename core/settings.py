@@ -54,7 +54,7 @@ MIDDLEWARE = [
 ]
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=1),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
 
     'REFRESH_TOKEN_LIFETIME': timedelta(days=90),
 
@@ -222,6 +222,12 @@ CELERY_BEAT_SCHEDULE = {
     'create-instructor-dossiers': {
         'task': 'dossier.tasks.create_instructor_dossiers_task',
         'schedule': crontab(hour=3, minute=0),
+    },
+
+    # Очистка истекших JWT токенов — каждый день в 4:00
+    'flush-expired-tokens': {
+        'task': 'account.tasks.flush_expired_tokens_task',
+        'schedule': crontab(hour=4, minute=0),
     },
 }
 
