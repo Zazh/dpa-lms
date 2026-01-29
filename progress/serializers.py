@@ -262,6 +262,7 @@ class MyCourseSerializer(serializers.Serializer):
     current_lesson = serializers.SerializerMethodField()
     group = serializers.SerializerMethodField()
     has_access = serializers.SerializerMethodField()
+    next_lesson_available_at = serializers.SerializerMethodField()
 
     def get_course(self, obj):
         return {
@@ -316,3 +317,26 @@ class MyCourseSerializer(serializers.Serializer):
 
     def get_has_access(self, obj):
         return obj.has_access()
+
+    def get_next_lesson_available_at(self, obj):
+        """Когда откроется следующий заблокированный урок"""
+        from .models import LessonProgress
+
+        # Находим первый незавершённый урок с датой доступности в будущем
+        locked_lesson = LessonProgress.objects.filter(
+            user=obj.user,
+            lesson__module__course=obj.course,
+            is_completed=False,
+            available_at__gt=timezone.now()
+        ).select_related('lesson').order_by(
+            'lesson__module__order',
+            'lesson__order'
+        ).first()
+
+        if locked_lesson:
+            return {
+                'lesson_id': locked_lesson.lesson.id,
+                'lesson_title': locked_lesson.lesson.title,
+                'available_at': locked_lesson.available_at.isoformat()
+            }
+        return None
