@@ -50,10 +50,10 @@ def start_quiz(request, quiz_id):
     quiz = get_object_or_404(QuizLesson, id=quiz_id)
 
     # Проверка: может ли пользователь начать тест
-    can_attempt, message = quiz.can_user_attempt(request.user)
+    can_attempt, message, available_at = quiz.can_user_attempt(request.user)
     if not can_attempt:
         return Response(
-            {'error': message},
+            {'error': message, 'available_at': available_at},
             status=status.HTTP_403_FORBIDDEN
         )
 

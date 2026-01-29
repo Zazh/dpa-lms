@@ -82,32 +82,44 @@ class QuizLesson(models.Model):
             score_percentage__gte=self.passing_score
         )
         if passed_attempts.exists():
-            return False, 'Тест уже сдан'
+            return False, 'Тест уже сдан', None
 
         # Проверка количества попыток
         if self.max_attempts > 0:
             if attempts.count() >= self.max_attempts:
-                return False, 'Исчерпан лимит попыток'
+                return False, 'Исчерпан лимит попыток', None
 
-        # Проверка задержки между попытками (теперь в минутах!)
-        if self.retry_delay_minutes > 0 and attempts.exists():
-            last_attempt = attempts.first()
-            if last_attempt.completed_at:
-                time_since_last = timezone.now() - last_attempt.completed_at
-                required_delay = timezone.timedelta(minutes=self.retry_delay_minutes)
-                if time_since_last < required_delay:
-                    remaining_seconds = (required_delay - time_since_last).total_seconds()
-                    remaining_minutes = int(remaining_seconds // 60)
+        # Проверка задержки между попытками
+        if self.retry_delay_minutes > 0:
+            # Учитываем completed И timeout
+            finished_attempts = attempts.filter(
+                status__in=['completed', 'timeout'],
+                completed_at__isnull=False
+            ).order_by('-completed_at')
+
+            if finished_attempts.exists():
+                last_attempt = finished_attempts.first()
+                available_at = last_attempt.completed_at + timezone.timedelta(minutes=self.retry_delay_minutes)
+
+                if timezone.now() < available_at:
+                    remaining = available_at - timezone.now()
+                    remaining_minutes = int(remaining.total_seconds() / 60)
 
                     if remaining_minutes >= 60:
                         hours = remaining_minutes // 60
                         mins = remaining_minutes % 60
                         if mins > 0:
-                            return False, f'Подождите {hours} ч. {mins} мин.'
-                        return False, f'Подождите {hours} ч.'
-                    return False, f'Подождите {remaining_minutes} мин.'
+                            message = f'Подождите {hours} ч. {mins} мин.'
+                        else:
+                            message = f'Подождите {hours} ч.'
+                    elif remaining_minutes < 1:
+                        message = 'Подождите 1 мин.'
+                    else:
+                        message = f'Подождите {remaining_minutes} мин.'
 
-        return True, 'OK'
+                    return False, message, available_at.isoformat()
+
+        return True, 'OK', None
 
 
 class QuizQuestion(models.Model):

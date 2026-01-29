@@ -150,7 +150,7 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
         """Может ли пользователь пройти тест"""
         request = self.context.get('request')
         if not request:
-            return {'allowed': False, 'message': 'Не авторизован'}
+            return {'allowed': False, 'message': 'Не авторизован', 'available_at': None}
 
         user = request.user
         user_attempts = getattr(obj, 'user_attempts_list', None)
@@ -158,33 +158,57 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
         if user_attempts is not None:
             attempts_count = len(user_attempts)
 
-            if obj.max_attempts and attempts_count >= obj.max_attempts:
-                return {'allowed': False, 'message': f'Достигнут лимит попыток ({obj.max_attempts})'}
+            # Проверка что тест уже сдан
+            passed_attempts = [a for a in user_attempts if
+                               a.status == 'completed' and a.score_percentage and a.score_percentage >= obj.passing_score]
+            if passed_attempts:
+                return {'allowed': False, 'message': 'Тест уже сдан', 'available_at': None}
 
-            # Проверка задержки между попытками (ТЕПЕРЬ В МИНУТАХ!)
+            # Проверка лимита попыток
+            if obj.max_attempts and attempts_count >= obj.max_attempts:
+                return {
+                    'allowed': False,
+                    'message': f'Достигнут лимит попыток ({obj.max_attempts})',
+                    'available_at': None
+                }
+
+            # Проверка задержки между попытками
             if obj.retry_delay_minutes and user_attempts:
                 from django.utils import timezone
-                last_attempt = max(user_attempts, key=lambda a: a.started_at)
-                if last_attempt.status == 'completed' and last_attempt.completed_at:
-                    time_since = timezone.now() - last_attempt.completed_at
-                    minutes_passed = time_since.total_seconds() / 60
-                    if minutes_passed < obj.retry_delay_minutes:
-                        remaining = int(obj.retry_delay_minutes - minutes_passed)
 
-                        if remaining >= 60:
-                            hours = remaining // 60
-                            mins = remaining % 60
+                # Учитываем completed И timeout
+                finished_attempts = [a for a in user_attempts if
+                                     a.status in ('completed', 'timeout') and a.completed_at]
+
+                if finished_attempts:
+                    last_attempt = max(finished_attempts, key=lambda a: a.completed_at)
+                    available_at = last_attempt.completed_at + timezone.timedelta(minutes=obj.retry_delay_minutes)
+
+                    if timezone.now() < available_at:
+                        remaining = available_at - timezone.now()
+                        remaining_minutes = int(remaining.total_seconds() / 60)
+
+                        if remaining_minutes >= 60:
+                            hours = remaining_minutes // 60
+                            mins = remaining_minutes % 60
                             if mins > 0:
-                                return {'allowed': False,
-                                        'message': f'Повторная попытка доступна через {hours} ч. {mins} мин.'}
-                            return {'allowed': False, 'message': f'Повторная попытка доступна через {hours} ч.'}
-                        return {'allowed': False, 'message': f'Повторная попытка доступна через {remaining} мин.'}
+                                message = f'Повторная попытка доступна через {hours} ч. {mins} мин.'
+                            else:
+                                message = f'Повторная попытка доступна через {hours} ч.'
+                        else:
+                            message = f'Повторная попытка доступна через {remaining_minutes} мин.'
 
-            return {'allowed': True, 'message': 'Можно начать тест'}
+                        return {
+                            'allowed': False,
+                            'message': message,
+                            'available_at': available_at.isoformat()
+                        }
+
+            return {'allowed': True, 'message': 'Можно начать тест', 'available_at': None}
 
         # Fallback к стандартному методу
-        can_attempt, message = obj.can_user_attempt(user)
-        return {'allowed': can_attempt, 'message': message}
+        can_attempt, message, available_at = obj.can_user_attempt(user)
+        return {'allowed': can_attempt, 'message': message, 'available_at': available_at}
 
     def get_user_attempts_count(self, obj):
         """Количество попыток пользователя - из prefetch"""
@@ -236,6 +260,7 @@ class QuizAttemptSerializer(serializers.ModelSerializer):
 
     quiz_title = serializers.CharField(source='quiz.lesson.title', read_only=True)
     duration = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = QuizAttempt
@@ -249,6 +274,14 @@ class QuizAttemptSerializer(serializers.ModelSerializer):
             'completed_at',
             'duration'
         ]
+
+    def get_status(self, obj):
+        """Проверяем реальный статус с учётом времени"""
+        if obj.status == 'in_progress' and obj.is_time_expired():
+            # Автоматически закрываем просроченную попытку
+            obj.complete_as_timeout()
+            return 'timeout'
+        return obj.status
 
     def get_duration(self, obj):
         """Длительность попытки"""
