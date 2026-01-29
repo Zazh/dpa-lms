@@ -78,7 +78,6 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
     total_points = serializers.SerializerMethodField()
     can_attempt = serializers.SerializerMethodField()
     user_attempts_count = serializers.SerializerMethodField()
-    best_score = serializers.SerializerMethodField()
 
     class Meta:
         model = QuizLesson
@@ -93,7 +92,6 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
             'total_points',
             'can_attempt',
             'user_attempts_count',
-            'best_score',
             'questions'
         ]
 
@@ -162,7 +160,7 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
             passed_attempts = [a for a in user_attempts if
                                a.status == 'completed' and a.score_percentage and a.score_percentage >= obj.passing_score]
             if passed_attempts:
-                return {'allowed': False, 'message': 'Тест уже сдан', 'available_at': None}
+                return {'allowed': False, 'message': 'Тест сдан', 'available_at': None}
 
             # Проверка лимита попыток
             if obj.max_attempts and attempts_count >= obj.max_attempts:
@@ -222,37 +220,6 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
         if not request:
             return 0
         return obj.attempts.filter(user=request.user).count()
-
-    def get_best_score(self, obj):
-        """Лучший результат пользователя - из prefetch"""
-        user_attempts = getattr(obj, 'user_attempts_list', None)
-
-        if user_attempts is not None:
-            completed = [a for a in user_attempts if a.status == 'completed']
-            if completed:
-                best = max(completed, key=lambda a: a.score_percentage)
-                return {
-                    'score': float(best.score_percentage),
-                    'passed': best.is_passed()
-                }
-            return None
-
-        # Fallback
-        request = self.context.get('request')
-        if not request:
-            return None
-
-        best_attempt = obj.attempts.filter(
-            user=request.user,
-            status='completed'
-        ).order_by('-score_percentage').first()
-
-        if best_attempt:
-            return {
-                'score': float(best_attempt.score_percentage),
-                'passed': best_attempt.is_passed()
-            }
-        return None
 
 
 class QuizAttemptSerializer(serializers.ModelSerializer):
