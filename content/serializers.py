@@ -22,7 +22,7 @@ class CourseListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'label', 'description', 'duration', 'modules_count', 'lessons_count', 'is_enrolled']
+        fields = ['id', 'title', 'label', 'description', 'duration', 'modules_count', 'lessons_count', 'is_enrolled', 'project_url']
 
     def get_modules_count(self, obj):
         # Используем аннотацию если есть
@@ -124,8 +124,7 @@ class CourseDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Course
-        fields = ['id', 'title', 'label', 'description', 'duration', 'modules_count', 'lessons_count', 'is_enrolled',
-                  'modules']
+        fields = ['id', 'title', 'label', 'description', 'duration', 'modules_count', 'lessons_count', 'is_enrolled', 'modules']
 
     def get_modules_count(self, obj):
         return obj.get_modules_count()

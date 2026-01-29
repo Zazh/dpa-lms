@@ -16,6 +16,14 @@ class Course(models.Model):
     duration = models.CharField('Длительность', max_length=100, blank=True, help_text='Например: "3 месяца"')
     description = models.TextField('Описание курса', blank=True)
 
+    # Добавь это новое поле:
+    project_url = models.URLField(
+        'Ссылка на проджаник',
+        max_length=500,
+        blank=True,
+        help_text='Ссылка на оригинальный проект (Notion, Confluence и т.д.)'
+    )
+
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

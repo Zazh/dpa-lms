@@ -30,7 +30,7 @@ class CourseAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Основная информация', {
-            'fields': ('title', 'label', 'duration', 'description')
+            'fields': ('title', 'label', 'duration', 'description', 'project_url')
         }),
         ('Статус', {
             'fields': ('is_active',)
