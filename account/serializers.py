@@ -19,6 +19,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     """Сериализатор для регистрации пользователя (Шаг 2)"""
     email = serializers.EmailField(read_only=True)
     referral_token = serializers.UUIDField(required=False, write_only=True)
+    phone = serializers.CharField(required=True)
 
     class Meta:
         model = User
@@ -74,33 +75,26 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     def validate_phone(self, value):
         """Валидация телефона"""
-        if value:
-            value = value.strip()
+        if not value or value.strip() in ['', '+7']:
+            raise serializers.ValidationError("Телефон обязателен для заполнения")
 
-            # Если телефон пустой или только +7, считаем его пустым
-            if value in ['', '+7']:
-                return None
+        value = value.strip()
 
-            # Убираем все кроме цифр и +
-            clean_phone = re.sub(r'[^\d+]', '', value)
+        # Убираем все кроме цифр и +
+        clean_phone = re.sub(r'[^\d+]', '', value)
 
-            # Проверяем формат: должен начинаться с +7 и иметь 11 цифр
-            if clean_phone:
-                if not clean_phone.startswith('+7'):
-                    raise serializers.ValidationError("Телефон должен начинаться с +7")
+        if not clean_phone.startswith('+7'):
+            raise serializers.ValidationError("Телефон должен начинаться с +7")
 
-                digits_only = clean_phone.replace('+', '')
-                if len(digits_only) != 11:
-                    raise serializers.ValidationError("Телефон должен содержать 11 цифр")
+        digits_only = clean_phone.replace('+', '')
+        if len(digits_only) != 11:
+            raise serializers.ValidationError("Телефон должен содержать 11 цифр")
 
-                # Проверка на уникальность телефона
-                if User.objects.filter(phone=clean_phone).exists():
-                    raise serializers.ValidationError("Пользователь с таким телефоном уже зарегистрирован")
+        # Проверка на уникальность телефона
+        if User.objects.filter(phone=clean_phone).exists():
+            raise serializers.ValidationError("Пользователь с таким телефоном уже зарегистрирован")
 
-                return clean_phone
-
-        return None
-
+        return clean_phone
 
 class SetPasswordSerializer(serializers.Serializer):
     """Сериализатор для установки пароля (Шаг 3)"""
@@ -180,29 +174,25 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
     def validate_phone(self, value):
         """Валидация телефона при обновлении"""
-        if value:
-            value = value.strip()
+        if not value or value.strip() in ['', '+7']:
+            raise serializers.ValidationError("Телефон обязателен для заполнения")
 
-            if value in ['', '+7']:
-                return None
+        value = value.strip()
 
-            clean_phone = re.sub(r'[^\d+]', '', value)
+        clean_phone = re.sub(r'[^\d+]', '', value)
 
-            if clean_phone:
-                if not clean_phone.startswith('+7'):
-                    raise serializers.ValidationError("Телефон должен начинаться с +7")
+        if not clean_phone.startswith('+7'):
+            raise serializers.ValidationError("Телефон должен начинаться с +7")
 
-                digits_only = clean_phone.replace('+', '')
-                if len(digits_only) != 11:
-                    raise serializers.ValidationError("Телефон должен содержать 11 цифр")
+        digits_only = clean_phone.replace('+', '')
+        if len(digits_only) != 11:
+            raise serializers.ValidationError("Телефон должен содержать 11 цифр")
 
-                # Проверка на уникальность (исключая текущего пользователя)
-                if User.objects.filter(phone=clean_phone).exclude(id=self.instance.id).exists():
-                    raise serializers.ValidationError("Пользователь с таким телефоном уже зарегистрирован")
+        # Проверка на уникальность (исключая текущего пользователя)
+        if User.objects.filter(phone=clean_phone).exclude(id=self.instance.id).exists():
+            raise serializers.ValidationError("Пользователь с таким телефоном уже зарегистрирован")
 
-                return clean_phone
-
-        return None
+        return clean_phone
 
 
 class EgovInitSerializer(serializers.Serializer):
@@ -238,7 +228,7 @@ class EgovRegistrationSerializer(serializers.Serializer):
     """Завершение регистрации после eGov авторизации"""
     registration_token = serializers.CharField()
     email = serializers.EmailField()
-    phone = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(required=True)
 
     def validate_email(self, value):
         value = value.lower().strip()
@@ -247,22 +237,22 @@ class EgovRegistrationSerializer(serializers.Serializer):
         return value
 
     def validate_phone(self, value):
-        if value:
-            value = value.strip()
-            if value in ['', '+7']:
-                return None
+        """Валидация телефона"""
+        if not value or value.strip() in ['', '+7']:
+            raise serializers.ValidationError("Телефон обязателен для заполнения")
 
-            clean_phone = re.sub(r'[^\d+]', '', value)
-            if clean_phone:
-                if not clean_phone.startswith('+7'):
-                    raise serializers.ValidationError("Телефон должен начинаться с +7")
+        value = value.strip()
 
-                digits_only = clean_phone.replace('+', '')
-                if len(digits_only) != 11:
-                    raise serializers.ValidationError("Телефон должен содержать 11 цифр")
+        clean_phone = re.sub(r'[^\d+]', '', value)
 
-                if User.objects.filter(phone=clean_phone).exists():
-                    raise serializers.ValidationError("Пользователь с таким телефоном уже зарегистрирован")
+        if not clean_phone.startswith('+7'):
+            raise serializers.ValidationError("Телефон должен начинаться с +7")
 
-                return clean_phone
-        return None
+        digits_only = clean_phone.replace('+', '')
+        if len(digits_only) != 11:
+            raise serializers.ValidationError("Телефон должен содержать 11 цифр")
+
+        if User.objects.filter(phone=clean_phone).exists():
+            raise serializers.ValidationError("Пользователь с таким телефоном уже зарегистрирован")
+
+        return clean_phone
