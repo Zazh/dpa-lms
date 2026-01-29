@@ -34,3 +34,8 @@ proc_name = "lms-gunicorn"
 
 # Предзагрузка приложения (экономия памяти)
 preload_app = True
+
+def post_fork(server, worker):
+    """Прогрев воркера после создания"""
+    from core.warmup import warmup
+    warmup()
