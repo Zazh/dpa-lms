@@ -55,7 +55,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name='Телефон'
     )
 
-    # ← ДОБАВИТЬ: Роль пользователя
+    # Роль пользователя
     ROLE_CHOICES = [
         ('student', 'Студент'),
         ('instructor', 'Инструктор'),
@@ -73,7 +73,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         help_text='Роль пользователя в системе'
     )
 
-    # ← ДОБАВИТЬ: Для инструкторов - назначенные группы
+    # Для инструкторов - назначенные группы
     assigned_groups = models.ManyToManyField(
         'groups.Group',
         blank=True,
@@ -113,7 +113,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Возвращает короткое имя пользователя"""
         return self.first_name
 
-    # ← ДОБАВИТЬ: Методы для проверки ролей
+    # Методы для проверки ролей
     def is_instructor(self):
         """Является ли пользователь инструктором (любого уровня)"""
         return self.role in ['instructor', 'super_instructor']
@@ -161,8 +161,18 @@ class User(AbstractBaseUser, PermissionsMixin):
         else:
             return Group.objects.none()
 
+    def save(self, *args, **kwargs):
+        """Нормализация ФИО перед сохранением"""
+        if self.first_name:
+            self.first_name = self.first_name.strip().upper()
+        if self.last_name:
+            self.last_name = self.last_name.strip().upper()
+        if self.middle_name:
+            self.middle_name = self.middle_name.strip().upper()
 
-# Остальные модели без изменений
+        super().save(*args, **kwargs)
+
+
 class EmailVerificationToken(models.Model):
     """Токен для подтверждения email и установки пароля"""
 
