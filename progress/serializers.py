@@ -254,32 +254,31 @@ class CourseProgressSerializer(serializers.ModelSerializer):
 
 
 class MyCourseSerializer(serializers.Serializer):
-    """Мой курс с прогрессом - ОПТИМИЗИРОВАНО"""
+    """Мой курс с прогрессом и группой"""
     course = serializers.SerializerMethodField()
     progress_percentage = serializers.DecimalField(max_digits=5, decimal_places=2)
-    completed_lessons_count = serializers.IntegerField()
+    completed_lessons = serializers.IntegerField(source='completed_lessons_count')
     total_lessons = serializers.SerializerMethodField()
     current_lesson = serializers.SerializerMethodField()
-    next_lesson_available_at = serializers.SerializerMethodField()
-    has_locked_lesson = serializers.SerializerMethodField()
+    group = serializers.SerializerMethodField()
+    has_access = serializers.SerializerMethodField()
 
     def get_course(self, obj):
         return {
             'id': obj.course.id,
             'title': obj.course.title,
             'label': obj.course.label,
-            'description': obj.course.description,
-            'duration': obj.course.duration,
+            'duration': obj.course.duration
         }
 
     def get_total_lessons(self, obj):
         # Используем аннотацию если есть
         if hasattr(obj, 'total_lessons_count'):
             return obj.total_lessons_count
-        return obj.course.get_lessons_count()
+
+        return Lesson.objects.filter(module__course=obj.course).count()
 
     def get_current_lesson(self, obj):
-        """Текущий урок (первый незавершённый доступный)"""
         lesson = obj.get_current_lesson()
         if lesson:
             return {
@@ -289,32 +288,31 @@ class MyCourseSerializer(serializers.Serializer):
             }
         return None
 
-    def get_next_lesson_available_at(self, obj):
-        """Когда откроется следующий заблокированный урок"""
-        from .models import LessonProgress
+    def get_group(self, obj):
+        if not obj.group:
+            return None
 
-        # Находим первый незавершённый недоступный урок
-        locked_lesson = LessonProgress.objects.filter(
-            user=obj.user,
-            lesson__module__course=obj.course,
-            is_completed=False
-        ).exclude(
-            available_at__isnull=True
-        ).order_by(
-            'lesson__module__order',
-            'lesson__order'
-        ).first()
+        # Используем prefetch если есть
+        membership = getattr(obj, '_prefetched_membership', None)
 
-        if locked_lesson and locked_lesson.available_at:
-            from django.utils import timezone
-            if locked_lesson.available_at > timezone.now():
-                return {
-                    'lesson_id': locked_lesson.lesson.id,
-                    'lesson_title': locked_lesson.lesson.title,
-                    'available_at': locked_lesson.available_at.isoformat()
-                }
-        return None
+        if membership is None:
+            from groups.models import GroupMembership
+            membership = GroupMembership.objects.filter(
+                user=obj.user,
+                group=obj.group,
+                is_active=True
+            ).first()
 
-    def get_has_locked_lesson(self, obj):
-        """Есть ли заблокированный урок"""
-        return self.get_next_lesson_available_at(obj) is not None
+        days_left = None
+        if membership and membership.personal_deadline_at:
+            delta = membership.personal_deadline_at - timezone.now()
+            days_left = max(0, delta.days)
+
+        return {
+            'name': obj.group.name,
+            'deadline': membership.personal_deadline_at if membership else None,
+            'days_left': days_left
+        }
+
+    def get_has_access(self, obj):
+        return obj.has_access()
