@@ -1,7 +1,7 @@
 # Gunicorn configuration for 8GB RAM VPS (4 shared CPU)
 
 # Количество воркеров: оптимально для shared CPU + Celery/Redis/PostgreSQL
-workers = 6
+workers = 8
 
 # 2 потока на воркер для лучшей обработки I/O
 threads = 2
