@@ -18,6 +18,9 @@ class QuizAnswerInline(admin.TabularInline):
         """Показать есть ли ответы студентов"""
         if not obj.pk:
             return '-'
+        # Проверяем что это QuizAnswer, а не родительский объект
+        if not hasattr(obj, 'selected_by'):
+            return '-'
         count = obj.selected_by.count()
         if count > 0:
             return format_html(
@@ -30,7 +33,7 @@ class QuizAnswerInline(admin.TabularInline):
 
     def has_delete_permission(self, request, obj=None):
         """Запретить удаление если есть ответы студентов"""
-        if obj and obj.selected_by.exists():
+        if obj and hasattr(obj, 'selected_by') and obj.selected_by.exists():
             return False
         return super().has_delete_permission(request, obj)
 
