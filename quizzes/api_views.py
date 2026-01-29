@@ -113,11 +113,20 @@ def submit_quiz(request, attempt_id):
     )
 
     # Проверка: попытка еще в процессе?
-    if attempt.status != 'in_progress':
-        return Response(
-            {'error': 'Попытка уже завершена'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    if attempt.is_time_expired():
+        attempt.complete_as_timeout()
+
+        return Response({
+            'success': False,
+            'passed': False,
+            'score': 0,
+            'passing_score': attempt.quiz.passing_score,
+            'correct_answers': 0,
+            'total_questions': attempt.quiz.questions.count(),
+            'attempt_number': attempt.attempt_number,
+            'time_expired': True,
+            'message': 'Время на прохождение теста истекло'
+        })
 
     # Валидация данных
     serializer = QuizSubmitSerializer(data=request.data)
@@ -184,7 +193,8 @@ def submit_quiz(request, attempt_id):
             'passing_score': attempt.quiz.passing_score,
             'correct_answers': correct_count,
             'total_questions': total_questions,
-            'attempt_number': attempt.attempt_number
+            'attempt_number': attempt.attempt_number,
+            'time_expired': False
         }
 
         # Если тест пройден - обновляем прогресс урока
@@ -336,7 +346,7 @@ def quiz_attempt_detail(request, attempt_id):
     )
 
     # Только для завершенных попыток
-    if attempt.status != 'completed':
+    if attempt.status == 'in_progress':
         return Response(
             {'error': 'Попытка еще не завершена'},
             status=status.HTTP_400_BAD_REQUEST

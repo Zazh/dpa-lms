@@ -119,7 +119,7 @@ class QuizLessonAdmin(admin.ModelAdmin):
             'fields': ('lesson',)
         }),
         ('Настройки прохождения', {
-            'fields': ('passing_score', 'max_attempts', 'retry_delay_hours', 'time_limit_minutes')
+            'fields': ('passing_score', 'max_attempts', 'retry_delay_minutes', 'time_limit_minutes')
         }),
         ('Настройки отображения', {
             'fields': ('show_correct_answers', 'shuffle_questions', 'shuffle_answers')

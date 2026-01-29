@@ -302,6 +302,30 @@ class QuizAttempt(models.Model):
             return (self.completed_at - self.started_at).total_seconds()
         return (timezone.now() - self.started_at).total_seconds()
 
+    def is_time_expired(self):
+        """Проверить, истекло ли время на прохождение теста"""
+        if self.quiz.time_limit_minutes <= 0:
+            return False  # Нет ограничения по времени
+
+        deadline = self.started_at + timezone.timedelta(minutes=self.quiz.time_limit_minutes)
+        return timezone.now() > deadline
+
+    def get_time_remaining_seconds(self):
+        """Получить оставшееся время в секундах"""
+        if self.quiz.time_limit_minutes <= 0:
+            return None  # Нет ограничения
+
+        deadline = self.started_at + timezone.timedelta(minutes=self.quiz.time_limit_minutes)
+        remaining = deadline - timezone.now()
+        return max(0, int(remaining.total_seconds()))
+
+    def complete_as_timeout(self):
+        """Завершить попытку по таймауту - ВСЕ ответы считаются неправильными"""
+        self.score_percentage = 0  # При таймауте всегда 0%
+        self.status = 'timeout'
+        self.completed_at = timezone.now()
+        self.save()
+
 
 class QuizResponse(models.Model):
     """Ответ пользователя на вопрос"""
