@@ -80,11 +80,15 @@ def _aggregate_final_exam_questions(quiz):
         per_quiz = max(1, quiz.total_questions // quiz_count)
         remainder = quiz.total_questions % quiz_count
 
-        for i, module_quiz in enumerate(module_quizzes):
+        # Рандомно выбираем какие тесты получат +1 вопрос
+        quiz_list = list(module_quizzes)
+        bonus_quizzes = set(random.sample(range(quiz_count), remainder)) if remainder else set()
+
+        for i, module_quiz in enumerate(quiz_list):
             questions = list(module_quiz.questions.all())
             if questions:
-                # Добавляем +1 вопрос к первым тестам если есть остаток
-                take = per_quiz + (1 if i < remainder else 0)
+                # +1 вопрос для случайно выбранных тестов
+                take = per_quiz + (1 if i in bonus_quizzes else 0)
                 sample_size = min(take, len(questions))
                 selected = random.sample(questions, sample_size)
                 all_questions.extend(selected)
