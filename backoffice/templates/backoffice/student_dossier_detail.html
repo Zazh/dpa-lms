@@ -162,8 +162,8 @@
                 <h2 class="text-lg font-medium text-gray-900 mb-4">🎯 Сданные тесты ({{ dossier.quizzes_history|length }})</h2>
                 {% for quiz in dossier.quizzes_history %}
                 <div class="mb-6 border border-gray-200 rounded-lg overflow-hidden">
-                    <!-- Заголовок теста -->
-                    <div class="px-4 py-3 bg-gray-50 flex items-center justify-between">
+                    <!-- Заголовок теста с маркером -->
+                    <div class="px-4 py-3 bg-gray-50 flex items-center justify-between"
                         <div>
                             <p class="font-medium text-gray-900">
                                 {{ quiz.lesson_title }}
