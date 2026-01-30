@@ -138,10 +138,15 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
 
     def get_questions_count(self, obj):
         """Количество вопросов - из prefetch без запроса"""
+        if obj.is_final_exam:
+            return obj.total_questions
         return len(list(obj.questions.all()))
 
     def get_total_points(self, obj):
         """Сумма баллов - из prefetch без запроса"""
+        if obj.is_final_exam:
+            # Для итогового теста: 1 балл за вопрос
+            return obj.total_questions
         return sum(q.points for q in obj.questions.all())
 
     def get_can_attempt(self, obj):

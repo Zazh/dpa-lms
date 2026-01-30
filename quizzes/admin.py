@@ -113,13 +113,20 @@ class QuizQuestionInline(admin.TabularInline):
 
 @admin.register(QuizLesson)
 class QuizLessonAdmin(admin.ModelAdmin):
-    list_display = ['lesson', 'passing_score', 'max_attempts', 'time_limit', 'questions_count', 'total_points']
+    list_display = ['lesson', 'is_final_badge', 'passing_score', 'max_attempts', 'time_limit', 'questions_count',
+                    'total_points']
+    list_filter = ['is_final_exam', 'lesson__module__course']
     search_fields = ['lesson__title']
     readonly_fields = ['questions_count', 'total_points']
 
     fieldsets = (
         ('Связь с уроком', {
             'fields': ('lesson',)
+        }),
+        ('Итоговый тест', {
+            'fields': ('is_final_exam', 'total_questions', 'questions_per_quiz'),
+            'classes': ('collapse',),
+            'description': 'Если включено — вопросы собираются из промежуточных тестов курса'
         }),
         ('Настройки прохождения', {
             'fields': ('passing_score', 'max_attempts', 'retry_delay_minutes', 'time_limit_minutes')
@@ -141,6 +148,15 @@ class QuizLessonAdmin(admin.ModelAdmin):
             kwargs["queryset"] = Lesson.objects.filter(lesson_type='quiz')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    def is_final_badge(self, obj):
+        if obj.is_final_exam:
+            return format_html(
+                '<span style="background-color: #dc3545; color: white; padding: 3px 8px; border-radius: 3px;">🎓 Итоговый</span>')
+        return format_html(
+            '<span style="background-color: #6c757d; color: white; padding: 3px 8px; border-radius: 3px;">📝 Обычный</span>')
+
+    is_final_badge.short_description = 'Тип'
+
     def time_limit(self, obj):
         if obj.time_limit_minutes > 0:
             return f'⏰ {obj.time_limit_minutes} мин'
@@ -150,6 +166,8 @@ class QuizLessonAdmin(admin.ModelAdmin):
 
     def questions_count(self, obj):
         if obj.pk:
+            if obj.is_final_exam:
+                return f'🎓 {obj.total_questions} (агрегация)'
             return f'❓ {obj.get_questions_count()}'
         return 0
 
@@ -161,7 +179,6 @@ class QuizLessonAdmin(admin.ModelAdmin):
         return 0
 
     total_points.short_description = 'Всего баллов'
-
 
 class QuizResponseInline(admin.TabularInline):
     """Inline для ответов попытки"""

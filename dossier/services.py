@@ -257,6 +257,7 @@ class DossierService:
             quizzes.append({
                 'quiz_id': quiz_id,
                 'lesson_title': attempt.quiz.lesson.title,
+                'is_final_exam': attempt.quiz.is_final_exam,
                 'attempt_number': attempt.attempt_number,
                 'score_percentage': float(attempt.score_percentage) if attempt.score_percentage else 0,
                 'passed': True,  # Всегда True, так как фильтруем только сданные

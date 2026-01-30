@@ -57,6 +57,25 @@ class QuizLesson(models.Model):
         default=False
     )
 
+    is_final_exam = models.BooleanField(
+        'Итоговый тест',
+        default=False,
+        help_text='Если включено — вопросы агрегируются из промежуточных тестов курса'
+    )
+
+    total_questions = models.PositiveIntegerField(
+        'Количество вопросов',
+        default=20,
+        validators=[MinValueValidator(1)],
+        help_text='Сколько вопросов включить в итоговый тест'
+    )
+
+    questions_per_quiz = models.PositiveIntegerField(
+        'Вопросов с каждого теста',
+        default=0,
+        help_text='0 = равномерно распределить. Иначе — фиксированное количество с каждого теста'
+    )
+
     class Meta:
         verbose_name = 'Тест'
         verbose_name_plural = 'Тесты'

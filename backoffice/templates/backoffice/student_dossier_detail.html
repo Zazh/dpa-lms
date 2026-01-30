@@ -165,7 +165,12 @@
                     <!-- Заголовок теста -->
                     <div class="px-4 py-3 bg-gray-50 flex items-center justify-between">
                         <div>
-                            <p class="font-medium text-gray-900">{{ quiz.lesson_title }}</p>
+                            <p class="font-medium text-gray-900">
+                                {{ quiz.lesson_title }}
+                                {% if quiz.is_final_exam %}
+                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">🎓 Итоговый</span>
+                                {% endif %}
+                            </p>
                             <p class="text-xs text-gray-500">Сдан с {{ quiz.attempt_number }}-й попытки | {{ quiz.completed_at|slice:":10" }}</p>
                         </div>
                         <div class="flex items-center space-x-3">

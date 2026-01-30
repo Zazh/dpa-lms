@@ -38,6 +38,67 @@ def _format_available_in(available_at):
         return f"через {minutes} мин."
 
 
+def _aggregate_final_exam_questions(quiz):
+    """
+    Собрать вопросы для итогового теста из промежуточных тестов курса.
+
+    Логика:
+    - Находим все промежуточные тесты курса (is_final_exam=False)
+    - Берём вопросы равномерно или по questions_per_quiz
+    - Перемешиваем итоговый набор
+    """
+    import random
+    from content.models import Module
+
+    course = quiz.lesson.module.course
+
+    # Получаем все промежуточные тесты курса (кроме итоговых)
+    module_quizzes = QuizLesson.objects.filter(
+        lesson__module__course=course,
+        is_final_exam=False
+    ).prefetch_related('questions__answers').order_by(
+        'lesson__module__order', 'lesson__order'
+    )
+
+    if not module_quizzes.exists():
+        return []
+
+    all_questions = []
+
+    if quiz.questions_per_quiz > 0:
+        # Фиксированное количество с каждого теста
+        for module_quiz in module_quizzes:
+            questions = list(module_quiz.questions.all())
+            if questions:
+                # Берём случайные вопросы из этого теста
+                sample_size = min(quiz.questions_per_quiz, len(questions))
+                selected = random.sample(questions, sample_size)
+                all_questions.extend(selected)
+    else:
+        # Равномерное распределение
+        quiz_count = module_quizzes.count()
+        per_quiz = max(1, quiz.total_questions // quiz_count)
+        remainder = quiz.total_questions % quiz_count
+
+        for i, module_quiz in enumerate(module_quizzes):
+            questions = list(module_quiz.questions.all())
+            if questions:
+                # Добавляем +1 вопрос к первым тестам если есть остаток
+                take = per_quiz + (1 if i < remainder else 0)
+                sample_size = min(take, len(questions))
+                selected = random.sample(questions, sample_size)
+                all_questions.extend(selected)
+
+    # Ограничиваем общее количество
+    if len(all_questions) > quiz.total_questions:
+        all_questions = random.sample(all_questions, quiz.total_questions)
+
+    # Финальное перемешивание
+    random.shuffle(all_questions)
+
+    return all_questions
+
+
 @api_view(['POST'])
 def start_quiz(request, quiz_id):
     """
@@ -50,10 +111,10 @@ def start_quiz(request, quiz_id):
     quiz = get_object_or_404(QuizLesson, id=quiz_id)
 
     # Проверка: может ли пользователь начать тест
-    can_attempt, message, available_at = quiz.can_user_attempt(request.user)
+    can_attempt, message, _ = quiz.can_user_attempt(request.user)
     if not can_attempt:
         return Response(
-            {'error': message, 'available_at': available_at},
+            {'error': message},
             status=status.HTTP_403_FORBIDDEN
         )
 
@@ -62,11 +123,16 @@ def start_quiz(request, quiz_id):
     attempt_number = attempts_count + 1
 
     # Получаем вопросы
-    questions = list(quiz.questions.all().order_by('order'))
+    if quiz.is_final_exam:
+        # Итоговый тест — агрегируем из промежуточных
+        questions = _aggregate_final_exam_questions(quiz)
+    else:
+        # Обычный тест — берём свои вопросы
+        questions = list(quiz.questions.all().order_by('order'))
 
-    # Перемешиваем вопросы если нужно
-    if quiz.shuffle_questions:
-        random.shuffle(questions)
+        # Перемешиваем вопросы если нужно
+        if quiz.shuffle_questions:
+            random.shuffle(questions)
 
     # Сохраняем порядок вопросов
     questions_order = [q.id for q in questions]
@@ -77,7 +143,7 @@ def start_quiz(request, quiz_id):
         quiz=quiz,
         attempt_number=attempt_number,
         status='in_progress',
-        questions_order=questions_order  # ← СОХРАНЯЕМ ПОРЯДОК
+        questions_order=questions_order
     )
 
     # Возвращаем информацию о попытке и вопросы
@@ -88,7 +154,6 @@ def start_quiz(request, quiz_id):
         'time_limit_minutes': quiz.time_limit_minutes,
         'quiz': QuizLessonDetailSerializer(quiz, context={'request': request, 'questions': questions}).data
     })
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -145,11 +210,21 @@ def submit_quiz(request, attempt_id):
             answer_ids = answer_data['answer_ids']
 
             # Получаем вопрос
-            question = get_object_or_404(
-                QuizQuestion,
-                id=question_id,
-                quiz=attempt.quiz
-            )
+            # Для итогового теста вопросы могут быть из других тестов курса
+            if attempt.quiz.is_final_exam:
+                # Проверяем что вопрос из questions_order этой попытки
+                if question_id not in attempt.questions_order:
+                    return Response(
+                        {'error': f'Вопрос {question_id} не принадлежит этой попытке'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                question = get_object_or_404(QuizQuestion, id=question_id)
+            else:
+                question = get_object_or_404(
+                    QuizQuestion,
+                    id=question_id,
+                    quiz=attempt.quiz
+                )
 
             # Получаем ответы в том порядке, как они были показаны
             # (из клиента должен прийти порядок, или восстанавливаем из attempt)
