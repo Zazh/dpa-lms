@@ -39,7 +39,7 @@ class GroupInstructorInline(admin.TabularInline):
 class GroupAdmin(admin.ModelAdmin):
     list_display = ['name', 'course', 'group_type_badges', 'deadline_display', 'status_badge', 'students_info',
                     'instructors_count', 'created_at']
-    list_filter = ['is_default', 'deadline_type', 'is_paid', 'is_active', 'course', 'created_at']
+    list_filter = ['is_default', 'deadline_type', 'is_paid', 'is_active', 'course', 'created_at', 'final_exam_date']
     search_fields = ['name', 'description', 'course__title']
     readonly_fields = ['referral_token', 'referral_link_display', 'created_at', 'updated_at', 'students_count',
                        'instructors_count', 'available_slots_display']
@@ -54,6 +54,11 @@ class GroupAdmin(admin.ModelAdmin):
         ('Дедлайн', {
             'fields': ('deadline_type', 'deadline_days', 'deadline_date'),
             'description': 'Для B2C (дефолтных) групп: deadline_days. Для B2B: deadline_date'
+        }),
+        ('Итоговый тест (для бесплатных групп)', {
+            'fields': ('final_exam_date', 'final_exam_start_time', 'final_exam_end_time'),
+            'classes': ('collapse',),
+            'description': 'Расписание итогового теста. Применяется только если группа НЕ платная (is_paid=False).'
         }),
         ('Ограничения', {
             'fields': ('max_students', 'available_slots_display', 'is_active')
