@@ -23,8 +23,16 @@
 
 <div class="bg-white shadow rounded-lg mb-6">
     <div class="px-4 py-5 sm:p-6">
-        <h1 class="text-2xl font-bold text-gray-900 mb-4">{{ group.name }}</h1>
-        <dl class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="flex items-center justify-between mb-4">
+            <h1 class="text-2xl font-bold text-gray-900">{{ group.name }}</h1>
+            {% if user.is_manager %}
+            <a href="{% url 'backoffice:group_edit' group.id %}"
+               class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                Настройки группы
+            </a>
+            {% endif %}
+        </div>
+        <dl class="grid grid-cols-1 gap-4 sm:grid-cols-4">
             <div>
                 <dt class="text-sm font-medium text-gray-500">Курс</dt>
                 <dd class="mt-1 text-sm text-gray-900">{{ group.course.title }}</dd>
@@ -34,9 +42,41 @@
                 <dd class="mt-1 text-sm text-gray-900">{{ students_count }}</dd>
             </div>
             <div>
+                <dt class="text-sm font-medium text-gray-500">Тип</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                    {% if group.is_default %}B2C (дефолтная){% else %}B2B{% endif %}
+                    &middot;
+                    {% if group.is_paid %}Платная{% else %}Бесплатная{% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Дедлайн</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ group.get_deadline_display }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Макс. студентов</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ group.get_available_slots }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Статус</dt>
+                <dd class="mt-1 text-sm">
+                    {% if group.is_active %}
+                    <span class="inline-flex px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">Активна</span>
+                    {% else %}
+                    <span class="inline-flex px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-800">Неактивна</span>
+                    {% endif %}
+                </dd>
+            </div>
+            <div>
                 <dt class="text-sm font-medium text-gray-500">Создана</dt>
                 <dd class="mt-1 text-sm text-gray-900">{{ group.created_at|date:"d.m.Y" }}</dd>
             </div>
+            {% if user.is_manager %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Реферальная ссылка</dt>
+                <dd class="mt-1 text-sm text-indigo-600 break-all">{{ group.get_referral_link }}</dd>
+            </div>
+            {% endif %}
         </dl>
     </div>
 </div>
@@ -55,8 +95,16 @@
                             <p class="text-sm font-medium text-indigo-600">{{ membership.user.get_full_name }}</p>
                             <p class="mt-1 text-sm text-gray-500">{{ membership.user.email }}</p>
                         </div>
-                        <div class="ml-4 flex-shrink-0">
+                        <div class="ml-4 flex-shrink-0 text-right">
                             <p class="text-xs text-gray-500">Присоединился: {{ membership.joined_at|date:"d.m.Y" }}</p>
+                            {% if membership.personal_deadline_at %}
+                            <p class="text-xs {% if membership.is_deadline_soon %}text-red-600 font-medium{% else %}text-gray-500{% endif %}">
+                                Дедлайн: {{ membership.personal_deadline_at|date:"d.m.Y" }}
+                                {% with days=membership.get_days_until_deadline %}
+                                {% if days is not None %}({{ days }} дн.){% endif %}
+                                {% endwith %}
+                            </p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Count, Q, F
-from .decorators import backoffice_required, instructor_required
+from .decorators import backoffice_required, instructor_required, instructor_or_manager_required, manager_required
 from groups.models import Group, GroupMembership
 from assignments.models import AssignmentSubmission
 from progress.models import CourseEnrollment
@@ -109,9 +109,9 @@ def assignment_detail(request, submission_id):
     return render(request, 'backoffice/assignment_detail.html', context)
 
 
-@instructor_required
+@instructor_or_manager_required
 def groups_list(request):
-    """Список групп"""
+    """Список групп (для инструкторов и менеджеров)"""
 
     user = request.user
 
@@ -127,15 +127,15 @@ def groups_list(request):
     return render(request, 'backoffice/groups_list.html', context)
 
 
-@instructor_required
+@instructor_or_manager_required
 def group_detail(request, group_id):
     """Детали группы + список студентов"""
 
     user = request.user
     group = get_object_or_404(Group, id=group_id)
 
-    # Проверка доступа для обычного инструктора
-    if not user.is_super_instructor():
+    # Проверка доступа для обычного инструктора (супер-инструкторы и менеджеры видят все)
+    if not (user.is_super_instructor() or user.is_manager()):
         accessible_groups = user.get_accessible_groups()
         if group not in accessible_groups:
             messages.error(request, 'У вас нет доступа к этой группе')
@@ -156,7 +156,7 @@ def group_detail(request, group_id):
     return render(request, 'backoffice/group_detail.html', context)
 
 
-@instructor_required
+@instructor_or_manager_required
 def student_progress(request, user_id, group_id):
     """Прогресс конкретного студента"""
 
@@ -167,8 +167,8 @@ def student_progress(request, user_id, group_id):
     student = get_object_or_404(User, id=user_id)
     group = get_object_or_404(Group, id=group_id)
 
-    # Проверка доступа для обычного инструктора
-    if not instructor.is_super_instructor():
+    # Проверка доступа для обычного инструктора (супер-инструкторы и менеджеры видят все)
+    if not (instructor.is_super_instructor() or instructor.is_manager()):
         accessible_groups = instructor.get_accessible_groups()
         if group not in accessible_groups:
             messages.error(request, 'У вас нет доступа к этой группе')
@@ -218,6 +218,116 @@ def student_progress(request, user_id, group_id):
     }
 
     return render(request, 'backoffice/student_progress.html', context)
+
+
+@manager_required
+def group_create(request):
+    """Создание группы (только для менеджеров)"""
+    from content.models import Course
+
+    courses = Course.objects.filter(is_active=True).order_by('title')
+
+    if request.method == 'POST':
+        course_id = request.POST.get('course')
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_paid = request.POST.get('is_paid') == 'on'
+        deadline_date = request.POST.get('deadline_date') or None
+        final_exam_date = request.POST.get('final_exam_date') or None
+        final_exam_start_time = request.POST.get('final_exam_start_time') or None
+        final_exam_end_time = request.POST.get('final_exam_end_time') or None
+        max_students = request.POST.get('max_students', 0)
+        is_active = request.POST.get('is_active') == 'on'
+
+        if not course_id or not name:
+            messages.error(request, 'Курс и название группы обязательны')
+        else:
+            try:
+                course = Course.objects.get(id=course_id, is_active=True)
+
+                parsed_deadline_date = None
+                if deadline_date:
+                    from django.utils.dateparse import parse_datetime
+                    parsed_deadline_date = parse_datetime(deadline_date)
+
+                group = Group.objects.create(
+                    course=course,
+                    name=name,
+                    description=description,
+                    is_default=False,
+                    is_paid=is_paid,
+                    deadline_type='fixed_date',
+                    deadline_date=parsed_deadline_date,
+                    final_exam_date=final_exam_date or None,
+                    final_exam_start_time=final_exam_start_time or None,
+                    final_exam_end_time=final_exam_end_time or None,
+                    max_students=int(max_students) if max_students else 0,
+                    is_active=is_active,
+                )
+                messages.success(request, f'Группа "{group.name}" успешно создана!')
+                return redirect('backoffice:group_detail', group_id=group.id)
+            except Course.DoesNotExist:
+                messages.error(request, 'Выбранный курс не найден')
+            except (ValueError, TypeError) as e:
+                messages.error(request, f'Ошибка в данных: {str(e)}')
+
+    context = {
+        'courses': courses,
+    }
+    return render(request, 'backoffice/group_create.html', context)
+
+
+@manager_required
+def group_edit(request, group_id):
+    """Редактирование настроек группы (только для менеджеров)"""
+    from content.models import Course
+
+    group = get_object_or_404(Group, id=group_id)
+    courses = Course.objects.filter(is_active=True).order_by('title')
+
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        description = request.POST.get('description', '').strip()
+        is_paid = request.POST.get('is_paid') == 'on'
+        deadline_date = request.POST.get('deadline_date') or None
+        final_exam_date = request.POST.get('final_exam_date') or None
+        final_exam_start_time = request.POST.get('final_exam_start_time') or None
+        final_exam_end_time = request.POST.get('final_exam_end_time') or None
+        max_students = request.POST.get('max_students', 0)
+        is_active = request.POST.get('is_active') == 'on'
+
+        if not name:
+            messages.error(request, 'Название группы обязательно')
+        else:
+            try:
+                group.name = name
+                group.description = description
+                # is_default не меняется — только через Django admin
+                group.is_paid = is_paid
+                # deadline_type и deadline_days не меняются — управляются через Django admin
+                if deadline_date:
+                    from django.utils.dateparse import parse_datetime
+                    group.deadline_date = parse_datetime(deadline_date)
+                else:
+                    group.deadline_date = None
+
+                group.final_exam_date = final_exam_date or None
+                group.final_exam_start_time = final_exam_start_time or None
+                group.final_exam_end_time = final_exam_end_time or None
+                group.max_students = int(max_students) if max_students else 0
+                group.is_active = is_active
+                group.save()
+
+                messages.success(request, f'Настройки группы "{group.name}" обновлены!')
+                return redirect('backoffice:group_detail', group_id=group.id)
+            except (ValueError, TypeError) as e:
+                messages.error(request, f'Ошибка в данных: {str(e)}')
+
+    context = {
+        'group': group,
+        'courses': courses,
+    }
+    return render(request, 'backoffice/group_edit.html', context)
 
 
 def no_access(request):

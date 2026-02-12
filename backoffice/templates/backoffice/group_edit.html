@@ -1,0 +1,172 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Настройки: {{ group.name }} - Backoffice{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <nav class="flex" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-4">
+            <li>
+                <a href="{% url 'backoffice:groups_list' %}" class="text-gray-400 hover:text-gray-500">Группы</a>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <a href="{% url 'backoffice:group_detail' group.id %}" class="ml-4 text-gray-400 hover:text-gray-500">{{ group.name }}</a>
+                </div>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="ml-4 text-sm font-medium text-gray-500">Настройки</span>
+                </div>
+            </li>
+        </ol>
+    </nav>
+</div>
+
+<div class="bg-white shadow rounded-lg">
+    <div class="px-4 py-5 sm:p-6">
+        <h1 class="text-2xl font-bold text-gray-900 mb-6">Настройки группы: {{ group.name }}</h1>
+
+        <form method="post" class="space-y-8">
+            {% csrf_token %}
+
+            <!-- Основная информация -->
+            <fieldset class="border border-gray-200 rounded-lg p-5">
+                <legend class="text-lg font-semibold text-gray-900 px-2">Основная информация</legend>
+                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 mt-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Курс</label>
+                        <input type="text" value="{{ group.course.title }}" disabled class="block w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
+                        <p class="mt-1 text-xs text-gray-500">Курс нельзя изменить после создания</p>
+                    </div>
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Название группы <span class="text-red-500">*</span></label>
+                        <input type="text" name="name" id="name" required value="{{ group.name }}" class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Описание</label>
+                        <textarea name="description" id="description" rows="3" class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">{{ group.description }}</textarea>
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- Тип группы -->
+            <fieldset class="border border-gray-200 rounded-lg p-5">
+                <legend class="text-lg font-semibold text-gray-900 px-2">Тип группы</legend>
+                <div class="mt-4 space-y-4">
+                    <label class="relative flex items-start p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <div class="flex h-6 items-center">
+                            <input type="checkbox" name="is_paid" id="is_paid" {% if group.is_paid %}checked{% endif %} class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        </div>
+                        <div class="ml-3">
+                            <span class="block text-sm font-medium text-gray-900">Платная группа</span>
+                            <span class="block text-sm text-gray-500">Требуется оплата для доступа к курсу</span>
+                        </div>
+                    </label>
+                    <label class="relative flex items-start p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <div class="flex h-6 items-center">
+                            <input type="checkbox" name="is_active" id="is_active" {% if group.is_active %}checked{% endif %} class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        </div>
+                        <div class="ml-3">
+                            <span class="block text-sm font-medium text-gray-900">Активна</span>
+                            <span class="block text-sm text-gray-500">Группа доступна для записи студентов</span>
+                        </div>
+                    </label>
+                </div>
+                {% if group.is_default %}
+                <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p class="text-sm text-blue-800">Эта группа является дефолтной (B2C) для курса. Изменить этот параметр можно только через администратора системы.</p>
+                </div>
+                {% endif %}
+            </fieldset>
+
+            <!-- Дедлайн -->
+            <fieldset class="border border-gray-200 rounded-lg p-5">
+                <legend class="text-lg font-semibold text-gray-900 px-2">Дедлайн</legend>
+                <div class="mt-4">
+                    <label for="deadline_date" class="block text-sm font-medium text-gray-700 mb-1">Дата дедлайна</label>
+                    <input type="datetime-local" name="deadline_date" id="deadline_date" {% if group.deadline_date %}value="{{ group.deadline_date|date:'Y-m-d\TH:i' }}"{% endif %} class="block w-full sm:w-80 rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                    <p class="mt-1 text-xs text-gray-500">Общий дедлайн для всех студентов группы. Если не указан — без ограничения по времени.</p>
+                </div>
+            </fieldset>
+
+            <!-- Итоговый тест (только для бесплатных групп) -->
+            <fieldset id="final_exam_section" class="border border-gray-200 rounded-lg p-5 {% if group.is_paid %}hidden{% endif %}">
+                <legend class="text-lg font-semibold text-gray-900 px-2">Итоговый тест (для бесплатных групп)</legend>
+                <p class="mt-2 text-sm text-gray-500 mb-4">Расписание итогового теста. Применяется только для бесплатных групп.</p>
+                <div class="grid grid-cols-1 gap-5 sm:grid-cols-3 mt-4">
+                    <div>
+                        <label for="final_exam_date" class="block text-sm font-medium text-gray-700 mb-1">Дата экзамена</label>
+                        <input type="date" name="final_exam_date" id="final_exam_date" {% if group.final_exam_date %}value="{{ group.final_exam_date|date:'Y-m-d' }}"{% endif %} class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label for="final_exam_start_time" class="block text-sm font-medium text-gray-700 mb-1">Время начала</label>
+                        <input type="time" name="final_exam_start_time" id="final_exam_start_time" {% if group.final_exam_start_time %}value="{{ group.final_exam_start_time|time:'H:i' }}"{% endif %} class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label for="final_exam_end_time" class="block text-sm font-medium text-gray-700 mb-1">Время окончания</label>
+                        <input type="time" name="final_exam_end_time" id="final_exam_end_time" {% if group.final_exam_end_time %}value="{{ group.final_exam_end_time|time:'H:i' }}"{% endif %} class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+            </fieldset>
+
+            <!-- Ограничения -->
+            <fieldset class="border border-gray-200 rounded-lg p-5">
+                <legend class="text-lg font-semibold text-gray-900 px-2">Ограничения</legend>
+                <div class="mt-4">
+                    <label for="max_students" class="block text-sm font-medium text-gray-700 mb-1">Максимум студентов</label>
+                    <input type="number" name="max_students" id="max_students" value="{{ group.max_students }}" min="0" class="block w-48 rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                    <p class="mt-1 text-xs text-gray-500">0 = без ограничения</p>
+                </div>
+            </fieldset>
+
+            <!-- Реферальная ссылка -->
+            <fieldset class="border border-gray-200 rounded-lg p-5">
+                <legend class="text-lg font-semibold text-gray-900 px-2">Реферальная ссылка</legend>
+                <div class="mt-4">
+                    <div class="flex items-center space-x-3">
+                        <input type="text" value="{{ group.get_referral_link }}" readonly id="referral_link" class="block flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-indigo-600">
+                        <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('referral_link').value)" class="px-4 py-2.5 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                            Копировать
+                        </button>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500">Отправьте эту ссылку студентам для автоматического зачисления</p>
+                </div>
+            </fieldset>
+
+            <!-- Кнопки -->
+            <div class="flex items-center justify-end space-x-3 pt-4 border-t">
+                <a href="{% url 'backoffice:group_detail' group.id %}" class="px-5 py-2.5 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50">
+                    Отмена
+                </a>
+                <button type="submit" class="px-5 py-2.5 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Сохранить изменения
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Показать/скрыть итоговый тест в зависимости от чекбокса "Платная"
+    const isPaidCheckbox = document.getElementById('is_paid');
+    const finalExamSection = document.getElementById('final_exam_section');
+
+    function toggleFinalExam() {
+        if (isPaidCheckbox.checked) {
+            finalExamSection.classList.add('hidden');
+        } else {
+            finalExamSection.classList.remove('hidden');
+        }
+    }
+
+    isPaidCheckbox.addEventListener('change', toggleFinalExam);
+    toggleFinalExam();
+</script>
+{% endblock %}

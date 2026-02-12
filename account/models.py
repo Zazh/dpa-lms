@@ -142,7 +142,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         """
         from groups.models import Group, GroupInstructor
 
-        if self.is_super_instructor():
+        if self.is_super_instructor() or self.is_manager():
+            # Супер-инструкторы и менеджеры видят все активные группы
             return Group.objects.filter(is_active=True)
         elif self.is_instructor():
             # Группы через GroupInstructor (назначенные в админке)

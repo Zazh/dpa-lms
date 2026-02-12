@@ -39,13 +39,31 @@ def instructor_required(view_func):
     return wrapper
 
 
+def instructor_or_manager_required(view_func):
+    """
+    Декоратор для инструкторов И менеджеров (общие view: группы, прогресс)
+    """
+
+    @wraps(view_func)
+    @login_required(login_url='backoffice:login')
+    def wrapper(request, *args, **kwargs):
+        user = request.user
+        if not (user.is_instructor() or user.is_manager()):
+            messages.error(request, 'Доступ запрещен. Только для инструкторов и менеджеров.')
+            return redirect('backoffice:no_access')
+
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
+
 def super_instructor_required(view_func):
     """
     Декоратор для супер-инструктора
     """
 
     @wraps(view_func)
-    @login_required(login_url='/admin/login/')
+    @login_required(login_url='backoffice:login')
     def wrapper(request, *args, **kwargs):
         if not request.user.is_super_instructor():
             messages.error(request, 'Доступ запрещен. Только для супер-инструкторов.')
@@ -62,7 +80,7 @@ def manager_required(view_func):
     """
 
     @wraps(view_func)
-    @login_required(login_url='/admin/login/')
+    @login_required(login_url='backoffice:login')
     def wrapper(request, *args, **kwargs):
         if not request.user.is_manager():
             messages.error(request, 'Доступ запрещен. Только для менеджеров.')
@@ -79,7 +97,7 @@ def super_manager_required(view_func):
     """
 
     @wraps(view_func)
-    @login_required(login_url='/admin/login/')
+    @login_required(login_url='backoffice:login')
     def wrapper(request, *args, **kwargs):
         if not request.user.is_super_manager():
             messages.error(request, 'Доступ запрещен. Только для супер-менеджеров.')
