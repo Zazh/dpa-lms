@@ -106,7 +106,7 @@ class QuizLesson(models.Model):
         # Проверка количества попыток
         if self.max_attempts > 0:
             if attempts.count() >= self.max_attempts:
-                return False, 'Исчерпан лимит попыток', None
+                return False, 'Исчерпан лимит попыток, обратитесь к своему инструктору', None
 
         # Проверка задержки между попытками
         if self.retry_delay_minutes > 0:

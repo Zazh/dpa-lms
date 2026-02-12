@@ -74,9 +74,9 @@ def preview_certificate(request):
         pass
 
     mock = MockCertificate()
-    mock.holder_name = 'Алдакуатов Елдос'
-    mock.course_title = 'Первоначальная теоретическая подготовка операторов БАС Категории 2'
-    mock.number = 'KZ2025A1B2C3'
+    mock.holder_name = 'Кушкинбаев Ерлан'
+    mock.course_title = 'Первоначальная практическая подготовка операторов БАС Категории 2, тип конструкции "Самолетный'
+    mock.number = 'KZ2026WRDAW2'
     mock.issued_at = date.today()
     mock.group_name = 'Группа А-101'
     mock.document_title = document_title
