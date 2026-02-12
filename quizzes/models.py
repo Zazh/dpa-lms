@@ -93,6 +93,24 @@ class QuizLesson(models.Model):
 
     def can_user_attempt(self, user):
         """Может ли пользователь пройти тест (проверка попыток и задержки)"""
+
+        # === ПРОВЕРКА РАСПИСАНИЯ ИТОГОВОГО ТЕСТА ===
+        if self.is_final_exam:
+            from progress.models import CourseEnrollment
+            course = self.lesson.module.course
+
+            enrollment = CourseEnrollment.objects.filter(
+                user=user,
+                course=course,
+                is_active=True
+            ).select_related('group').first()
+
+            if enrollment and enrollment.group:
+                is_available, message = enrollment.group.is_final_exam_available()
+                if not is_available:
+                    return False, message, None
+
+
         attempts = self.attempts.filter(user=user).order_by('-started_at')
 
         # Проверка, что тест уже сдан

@@ -156,6 +156,31 @@ class QuizLessonDetailSerializer(serializers.ModelSerializer):
             return {'allowed': False, 'message': 'Не авторизован', 'available_at': None}
 
         user = request.user
+
+        # === ПРОВЕРКА РАСПИСАНИЯ ИТОГОВОГО ТЕСТА ===
+        if obj.is_final_exam:
+            from progress.models import CourseEnrollment
+            course = obj.lesson.module.course
+
+            enrollment = CourseEnrollment.objects.filter(
+                user=user,
+                course=course,
+                is_active=True
+            ).select_related('group').first()
+
+            if enrollment and enrollment.group:
+                is_available, message = enrollment.group.is_final_exam_available()
+                if not is_available:
+                    # Добавляем расписание в ответ
+                    schedule = enrollment.group.get_final_exam_schedule()
+                    return {
+                        'allowed': False,
+                        'message': message,
+                        'available_at': None,
+                        'exam_schedule': schedule,
+                    }
+
+
         user_attempts = getattr(obj, 'user_attempts_list', None)
 
         if user_attempts is not None:

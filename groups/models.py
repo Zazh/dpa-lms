@@ -72,6 +72,28 @@ class Group(models.Model):
         help_text='Для B2B групп: общий дедлайн для всех студентов'
     )
 
+    # === Расписание итогового теста ===
+    final_exam_date = models.DateField(
+        'Дата итогового теста',
+        null=True,
+        blank=True,
+        help_text='Для бесплатных групп: дата проведения итогового теста'
+    )
+
+    final_exam_start_time = models.TimeField(
+        'Начало итогового теста',
+        null=True,
+        blank=True,
+        help_text='Время открытия теста (например, 15:00)'
+    )
+
+    final_exam_end_time = models.TimeField(
+        'Окончание итогового теста',
+        null=True,
+        blank=True,
+        help_text='Время закрытия теста (например, 17:00)'
+    )
+
     # Ограничения
     max_students = models.PositiveIntegerField(
         'Максимум студентов',
@@ -206,6 +228,85 @@ class Group(models.Model):
         elif self.deadline_days > 0:
             return f"⏰ {self.deadline_days} дн. (персон.)"
         return '∞ Бессрочно'
+
+    def is_final_exam_available(self):
+        """
+        Проверить, доступен ли итоговый тест прямо сейчас.
+
+        Для бесплатных групп — только в назначенную дату и временное окно.
+        Для платных групп — всегда доступен (возвращает True).
+
+        Returns:
+            tuple: (is_available: bool, message: str)
+        """
+        # Платные группы — без ограничений по расписанию
+        if self.is_paid:
+            return True, 'OK'
+
+        # Бесплатная группа — проверяем расписание
+        if not self.final_exam_date:
+            return False, 'Дата итогового теста не назначена'
+
+        if not self.final_exam_start_time or not self.final_exam_end_time:
+            return False, 'Время проведения итогового теста не указано'
+
+        now = timezone.now()
+        # Используем таймзону Казахстана (Алматы)
+        import zoneinfo
+        kz_tz = zoneinfo.ZoneInfo('Asia/Almaty')
+        now_kz = now.astimezone(kz_tz)
+
+        current_date = now_kz.date()
+        current_time = now_kz.time()
+
+        # Проверяем дату
+        if current_date < self.final_exam_date:
+            days_left = (self.final_exam_date - current_date).days
+            return False, (
+                f'Итоговый тест состоится {self.final_exam_date.strftime("%d.%m.%Y")} '
+                f'с {self.final_exam_start_time.strftime("%H:%M")} '
+                f'до {self.final_exam_end_time.strftime("%H:%M")}. '
+                f'Осталось {days_left} дн.'
+            )
+
+        if current_date > self.final_exam_date:
+            return False, (
+                f'Итоговый тест был назначен на {self.final_exam_date.strftime("%d.%m.%Y")}. '
+                f'Срок прошёл.'
+            )
+
+        # Дата совпадает — проверяем время
+        if current_time < self.final_exam_start_time:
+            return False, (
+                f'Итоговый тест откроется сегодня в {self.final_exam_start_time.strftime("%H:%M")}. '
+                f'Подождите.'
+            )
+
+        if current_time > self.final_exam_end_time:
+            return False, (
+                f'Итоговый тест завершился в {self.final_exam_end_time.strftime("%H:%M")}. '
+                f'Время вышло.'
+            )
+
+        return True, 'OK'
+
+    def get_final_exam_schedule(self):
+        """
+        Вернуть информацию о расписании итогового теста для API.
+
+        Returns:
+            dict или None
+        """
+        if self.is_paid or not self.final_exam_date:
+            return None
+
+        return {
+            'date': self.final_exam_date.isoformat(),
+            'start_time': self.final_exam_start_time.strftime('%H:%M') if self.final_exam_start_time else None,
+            'end_time': self.final_exam_end_time.strftime('%H:%M') if self.final_exam_end_time else None,
+            'is_available': self.is_final_exam_available()[0],
+            'message': self.is_final_exam_available()[1],
+        }
 
     @classmethod
     def deactivate_expired_memberships(cls):
