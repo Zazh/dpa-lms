@@ -107,6 +107,7 @@ class JoinGroupByTokenView(APIView):
             )
 
         # Создаем зачисление на курс (с защитой от race condition)
+        progress_was_reset = False
         try:
             enrollment = CourseEnrollment.objects.create(
                 user=request.user,
@@ -120,6 +121,21 @@ class JoinGroupByTokenView(APIView):
                 user=request.user,
                 course=group.course
             )
+
+            # Если enrollment был неактивен (дедлайн истёк) — сбрасываем прогресс,
+            # чтобы незавершённые данные не попали в досье при новом обучении.
+            # Не сбрасываем если студент уже выпускник (Graduate существует).
+            if not enrollment.is_active:
+                from graduates.models import Graduate
+                has_graduated = Graduate.objects.filter(
+                    user=request.user,
+                    course=group.course
+                ).exists()
+
+                if not has_graduated:
+                    enrollment.reset_progress()
+                    progress_was_reset = True
+
             enrollment.group = group
             enrollment.is_active = True
             enrollment.save(update_fields=['group', 'is_active'])
@@ -140,9 +156,14 @@ class JoinGroupByTokenView(APIView):
             if created:
                 progress.calculate_available_at()
 
+        if progress_was_reset:
+            msg = f'Вы добавлены в группу "{group.name}". Прогресс сброшен — начинайте обучение заново.'
+        else:
+            msg = f'Вы успешно добавлены в группу "{group.name}"'
+
         return Response({
             'success': True,
-            'message': f'Вы успешно добавлены в группу "{group.name}"',
+            'message': msg,
             'enrollment': {
                 'course': group.course.title,
                 'group': group.name,

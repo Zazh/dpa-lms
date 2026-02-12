@@ -103,6 +103,51 @@ class CourseEnrollment(models.Model):
         return f"{status} {self.user.get_full_name()} → {self.course.title} ({group_name})"
 
 
+    def reset_progress(self):
+        """
+        Полный сброс прогресса по курсу.
+        Удаляет LessonProgress, QuizAttempts, AssignmentSubmissions, VideoProgress.
+        Сбрасывает счётчики enrollment.
+
+        Вызывается при повторном зачислении после истечения дедлайна,
+        чтобы незавершённый прогресс не попал в досье.
+        """
+        from quizzes.models import QuizAttempt
+        from assignments.models import AssignmentSubmission
+
+        course = self.course
+        user = self.user
+
+        # Удаляем прогресс уроков
+        LessonProgress.objects.filter(
+            user=user,
+            lesson__module__course=course
+        ).delete()
+
+        # Удаляем попытки тестов (каскадно удалит QuizResponse)
+        QuizAttempt.objects.filter(
+            user=user,
+            quiz__lesson__module__course=course
+        ).delete()
+
+        # Удаляем сдачи заданий
+        AssignmentSubmission.objects.filter(
+            user=user,
+            assignment__lesson__module__course=course
+        ).delete()
+
+        # Удаляем прогресс видео
+        VideoProgress.objects.filter(
+            user=user,
+            video_lesson__lesson__module__course=course
+        ).delete()
+
+        # Сбрасываем счётчики enrollment
+        self.progress_percentage = 0
+        self.completed_lessons_count = 0
+        self.last_activity_at = None
+        self.save(update_fields=['progress_percentage', 'completed_lessons_count', 'last_activity_at'])
+
     def calculate_progress(self):
         """Рассчитать прогресс по курсу"""
         # Получаем все уроки курса

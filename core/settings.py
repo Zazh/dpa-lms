@@ -229,6 +229,12 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'account.tasks.flush_expired_tokens_task',
         'schedule': crontab(hour=4, minute=0),
     },
+
+    # Деактивация членств с истекшим дедлайном — каждый час
+    'deactivate-expired-memberships': {
+        'task': 'groups.tasks.deactivate_expired_memberships_task',
+        'schedule': crontab(minute=0),
+    },
 }
 
 # Django Silk - профилирование запросов
