@@ -362,7 +362,18 @@ def quiz_attempts_list(request):
             ).distinct()
 
     # Применяем фильтр по статусу для отображения
-    filtered_attempts = attempts.filter(status=status_filter).order_by('-started_at')
+    if status_filter == 'passed':
+        filtered_attempts = attempts.filter(
+            status='completed',
+            score_percentage__gte=F('quiz__passing_score')
+        ).order_by('-started_at')
+    elif status_filter == 'failed':
+        filtered_attempts = attempts.filter(
+            status='completed',
+            score_percentage__lt=F('quiz__passing_score')
+        ).order_by('-started_at')
+    else:
+        filtered_attempts = attempts.filter(status=status_filter).order_by('-started_at')
 
     # Статистика - ТОЖЕ с учетом групп!
     stats = {

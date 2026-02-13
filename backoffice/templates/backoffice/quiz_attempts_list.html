@@ -74,6 +74,8 @@
     <div class="px-4 py-5 sm:p-6">
         <div class="flex space-x-4">
             <a href="?status=completed" class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'completed' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">Завершенные</a>
+            <a href="?status=passed" class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'passed' %}bg-green-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">Сданные</a>
+            <a href="?status=failed" class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'failed' %}bg-red-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">Не сданные</a>
             <a href="?status=in_progress" class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'in_progress' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">В процессе</a>
             <a href="?status=timeout" class="px-4 py-2 rounded-md text-sm font-medium {% if status_filter == 'timeout' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">Время истекло</a>
         </div>
