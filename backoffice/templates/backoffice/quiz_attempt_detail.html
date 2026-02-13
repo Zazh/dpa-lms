@@ -220,6 +220,13 @@
                 <h3 class="text-base font-medium text-gray-900 mb-4">Действия</h3>
 
                 <div class="space-y-3">
+                    {% if attempt.status == 'completed' or attempt.status == 'timeout' %}
+                    <a href="{% url 'backoffice:export_quiz_attempt_pdf' attempt.id %}"
+                       class="block w-full text-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        📄 Скачать результат в PDF
+                    </a>
+                    {% endif %}
+
                     {% if enrollment and enrollment.group %}
                     <a href="{% url 'backoffice:student_progress' attempt.user.id enrollment.group.id %}"
                        class="block w-full text-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">

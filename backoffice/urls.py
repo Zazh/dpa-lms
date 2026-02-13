@@ -30,6 +30,7 @@ urlpatterns = [
     # Результаты тестов
     path('quizzes/', views.quiz_attempts_list, name='quiz_attempts_list'),
     path('quizzes/<int:attempt_id>/', views.quiz_attempt_detail, name='quiz_attempt_detail'),
+    path('quizzes/<int:attempt_id>/export-pdf/', views.export_quiz_attempt_pdf, name='export_quiz_attempt_pdf'),
 
     # Выпускники
     path('graduates/', views.graduates_list, name='graduates_list'),

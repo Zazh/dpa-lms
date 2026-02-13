@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Count, Q, F
@@ -426,6 +427,55 @@ def quiz_attempt_detail(request, attempt_id):
     }
 
     return render(request, 'backoffice/quiz_attempt_detail.html', context)
+
+
+@instructor_required
+def export_quiz_attempt_pdf(request, attempt_id):
+    """Скачать результат попытки теста в PDF"""
+
+    from quizzes.models import QuizAttempt
+    from exports.services import QuizResultPDFService
+
+    attempt = get_object_or_404(
+        QuizAttempt.objects.select_related(
+            'quiz__lesson__module__course',
+            'user'
+        ).filter(status__in=['completed', 'timeout']),
+        id=attempt_id,
+    )
+
+    user = request.user
+
+    # Проверка доступа для обычного инструктора
+    if not user.is_super_instructor():
+        enrollment = CourseEnrollment.objects.filter(
+            user=attempt.user,
+            course=attempt.quiz.lesson.module.course,
+        ).select_related('group').first()
+
+        accessible_groups = user.get_accessible_groups()
+
+        if not enrollment or enrollment.group not in accessible_groups:
+            messages.error(request, 'У вас нет доступа к этой попытке')
+            return redirect('backoffice:quiz_attempts_list')
+
+    service = QuizResultPDFService()
+
+    try:
+        pdf_content = service.generate(attempt)
+    except Exception as e:
+        messages.error(request, f'Ошибка генерации PDF: {str(e)}')
+        return redirect('backoffice:quiz_attempt_detail', attempt_id=attempt_id)
+
+    student_name = attempt.user.get_full_name().replace(' ', '_')
+    lesson_title = attempt.quiz.lesson.title.replace(' ', '_')[:30]
+    filename = f"quiz_{student_name}_{lesson_title}.pdf"
+
+    response = HttpResponse(pdf_content, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    return response
+
 
 @instructor_required
 def assignments_check(request):
