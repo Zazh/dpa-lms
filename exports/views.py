@@ -20,13 +20,10 @@ class QuizResultPDFView(APIView):
 
     def get(self, request, attempt_id):
         attempt = get_object_or_404(
-            QuizAttempt.objects.select_related(
-                'quiz__lesson__module__course',
-                'user'
-            ),
+            QuizAttempt,
             id=attempt_id,
             user=request.user,
-            status='completed'
+            status='completed',
         )
 
         service = QuizResultPDFService()
@@ -74,10 +71,10 @@ def preview_certificate(request):
         pass
 
     mock = MockCertificate()
-    mock.holder_name = 'Кушкинбаев Ерлан'
-    mock.course_title = 'Первоначальная практическая подготовка операторов БАС Категории 2, тип конструкции "Самолетный'
-    mock.number = 'KZ2026WRDAW2'
-    mock.issued_at = date.today()
+    mock.holder_name = 'Оңласынов Жұлдызбек'
+    mock.course_title = 'Первоначальная теоретическая подготовка операторов<br>БАС Категории 2'
+    mock.number = 'KZ2026547J6U' # 547J6U - это генерация случайная только цифры и буквы строчные
+    mock.issued_at = date(2026, 2, 10)  # date.today()
     mock.group_name = 'Группа А-101'
     mock.document_title = document_title
     mock.completion_text = completion_text
