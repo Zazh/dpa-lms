@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Count, Q, F
 from .decorators import backoffice_required, instructor_required, instructor_or_manager_required, manager_required
-from groups.models import Group, GroupMembership
+from groups.models import Group, GroupMembership, GroupInstructor
 from assignments.models import AssignmentSubmission
 from progress.models import CourseEnrollment
 from graduates.models import Graduate
@@ -225,8 +225,10 @@ def student_progress(request, user_id, group_id):
 def group_create(request):
     """Создание группы (только для менеджеров)"""
     from content.models import Course
+    from account.models import User
 
     courses = Course.objects.filter(is_active=True).order_by('title')
+    instructors = User.objects.filter(role__in=['instructor', 'super_instructor']).order_by('last_name', 'first_name')
 
     if request.method == 'POST':
         course_id = request.POST.get('course')
@@ -239,6 +241,7 @@ def group_create(request):
         final_exam_end_time = request.POST.get('final_exam_end_time') or None
         max_students = request.POST.get('max_students', 0)
         is_active = request.POST.get('is_active') == 'on'
+        instructor_ids = request.POST.getlist('instructors')
 
         if not course_id or not name:
             messages.error(request, 'Курс и название группы обязательны')
@@ -265,6 +268,14 @@ def group_create(request):
                     max_students=int(max_students) if max_students else 0,
                     is_active=is_active,
                 )
+
+                # Назначить выбранных инструкторов
+                for instructor_id in instructor_ids:
+                    GroupInstructor.objects.create(
+                        group=group,
+                        instructor_id=int(instructor_id),
+                    )
+
                 messages.success(request, f'Группа "{group.name}" успешно создана!')
                 return redirect('backoffice:group_detail', group_id=group.id)
             except Course.DoesNotExist:
@@ -274,6 +285,7 @@ def group_create(request):
 
     context = {
         'courses': courses,
+        'instructors': instructors,
     }
     return render(request, 'backoffice/group_create.html', context)
 
@@ -282,9 +294,14 @@ def group_create(request):
 def group_edit(request, group_id):
     """Редактирование настроек группы (только для менеджеров)"""
     from content.models import Course
+    from account.models import User
 
     group = get_object_or_404(Group, id=group_id)
     courses = Course.objects.filter(is_active=True).order_by('title')
+    instructors = User.objects.filter(role__in=['instructor', 'super_instructor']).order_by('last_name', 'first_name')
+    current_instructor_ids = list(
+        group.instructors.filter(is_active=True).values_list('instructor_id', flat=True)
+    )
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -296,6 +313,7 @@ def group_edit(request, group_id):
         final_exam_end_time = request.POST.get('final_exam_end_time') or None
         max_students = request.POST.get('max_students', 0)
         is_active = request.POST.get('is_active') == 'on'
+        instructor_ids = request.POST.getlist('instructors')
 
         if not name:
             messages.error(request, 'Название группы обязательно')
@@ -319,6 +337,20 @@ def group_edit(request, group_id):
                 group.is_active = is_active
                 group.save()
 
+                # Синхронизировать инструкторов
+                new_ids = set(int(i) for i in instructor_ids)
+                old_ids = set(current_instructor_ids)
+
+                # Удалить убранных
+                GroupInstructor.objects.filter(group=group).exclude(instructor_id__in=new_ids).delete()
+
+                # Добавить новых
+                for instructor_id in new_ids - old_ids:
+                    GroupInstructor.objects.create(
+                        group=group,
+                        instructor_id=instructor_id,
+                    )
+
                 messages.success(request, f'Настройки группы "{group.name}" обновлены!')
                 return redirect('backoffice:group_detail', group_id=group.id)
             except (ValueError, TypeError) as e:
@@ -327,6 +359,8 @@ def group_edit(request, group_id):
     context = {
         'group': group,
         'courses': courses,
+        'instructors': instructors,
+        'current_instructor_ids': current_instructor_ids,
     }
     return render(request, 'backoffice/group_edit.html', context)
 
