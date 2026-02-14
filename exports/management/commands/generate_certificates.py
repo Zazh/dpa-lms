@@ -16,8 +16,6 @@ from exports.services import CertificatePDFService
 HOLDERS = {
     '920401302543': 'Оңласынов Жұлдызбек',
     '030521502077': 'Мирсидиков Шохнур',
-    '970412301316': 'Әкім Мирас',
-    '020722501426': 'Бейсембаев Самат',
 }
 # =============================================================================
 
@@ -32,6 +30,9 @@ STAMP_CSS_CLASS = 'stamp-img-1'
 SIGNATURE_CSS_CLASS = 'aft-img-1'
 SIGNER_NAME = 'Худайбергенова П.Т.'
 SIGNER_POSITION = 'Генеральный директор<br>ТОО "Aerial Solutions"'
+
+# Дата выдачи: None = сегодня, или точная дата date(2026, 2, 10)
+ISSUED_AT = date(2026, 2, 10)
 
 
 def get_existing_numbers(base_dir):
@@ -103,7 +104,7 @@ class Command(BaseCommand):
             mock.holder_name = name
             mock.course_title = COURSE_TITLE
             mock.number = cert_number
-            mock.issued_at = date.today()
+            mock.issued_at = ISSUED_AT or date.today()
             mock.group_name = GROUP_NAME
             mock.document_title = DOCUMENT_TITLE
             mock.completion_text = COMPLETION_TEXT
