@@ -11,13 +11,8 @@ class GroupMembershipInline(admin.TabularInline):
     extra = 0
     fields = ['user', 'is_active', 'enrolled_via_referral', 'personal_deadline_at', 'joined_at']
     readonly_fields = ['joined_at', 'enrolled_via_referral', 'personal_deadline_at']
+    autocomplete_fields = ['user']
     ordering = ['-is_active', '-joined_at']
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Показывать только обычных пользователей (не staff)"""
-        if db_field.name == "user":
-            kwargs["queryset"] = kwargs.get("queryset", db_field.related_model.objects).filter(is_staff=False)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 class GroupInstructorInline(admin.TabularInline):
@@ -212,6 +207,7 @@ class GroupMembershipAdmin(admin.ModelAdmin):
                     'duration_display']
     list_filter = ['is_active', 'enrolled_via_referral', 'group__course', 'joined_at']
     search_fields = ['user__email', 'user__first_name', 'user__last_name', 'group__name']
+    autocomplete_fields = ['user', 'group']
     readonly_fields = ['joined_at', 'left_at', 'duration_days', 'days_until_deadline_display']
     date_hierarchy = 'joined_at'
 
