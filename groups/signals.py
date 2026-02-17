@@ -18,7 +18,7 @@ def auto_enroll_on_membership_create(sender, instance, created, **kwargs):
     if not created or not instance.is_active:
         return
 
-    from django.db import IntegrityError
+    from django.db import IntegrityError, transaction
     from content.models import Lesson
     from progress.models import CourseEnrollment, LessonProgress
 
@@ -28,12 +28,13 @@ def auto_enroll_on_membership_create(sender, instance, created, **kwargs):
 
     # 1. Создаём или обновляем CourseEnrollment
     try:
-        enrollment = CourseEnrollment.objects.create(
-            user=user,
-            course=course,
-            group=group,
-            is_active=True,
-        )
+        with transaction.atomic():
+            enrollment = CourseEnrollment.objects.create(
+                user=user,
+                course=course,
+                group=group,
+                is_active=True,
+            )
         logger.info(
             f"Создано зачисление: {user.email} → {course.title} ({group.name})"
         )

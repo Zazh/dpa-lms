@@ -311,14 +311,15 @@ class LessonProgress(models.Model):
         Безопасное создание прогресса с защитой от race condition.
         Используй вместо get_or_create во всех местах.
         """
-        from django.db import IntegrityError
+        from django.db import IntegrityError, transaction
 
         try:
-            obj, created = cls.objects.get_or_create(
-                user=user,
-                lesson=lesson,
-                defaults=defaults or {'is_completed': False}
-            )
+            with transaction.atomic():
+                obj, created = cls.objects.get_or_create(
+                    user=user,
+                    lesson=lesson,
+                    defaults=defaults or {'is_completed': False}
+                )
             return obj, created
         except IntegrityError:
             # Запись создана другим процессом — получаем её
