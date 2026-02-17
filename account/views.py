@@ -155,55 +155,25 @@ class SetPasswordView(APIView):
         NotificationService.notify_registration_completed(user)
 
         # АВТОМАТИЧЕСКОЕ ЗАЧИСЛЕНИЕ ПО РЕФЕРАЛЬНОЙ ССЫЛКЕ
+        # CourseEnrollment и LessonProgress создаются автоматически
+        # через сигнал post_save на GroupMembership (groups/signals.py)
         enrollment_info = None
         if referral_token:
             try:
                 from groups.models import Group
-                from progress.models import CourseEnrollment, LessonProgress
-                from content.models import Lesson
 
                 group = Group.objects.get(referral_token=referral_token, is_active=True)
 
-                # Проверяем, что группа не заполнена
                 if not group.is_full():
-                    # Добавляем в группу
                     success, message = group.add_student(user, enrolled_via_referral=True)
 
                     if success:
-                        # Создаем зачисление
-                        try:
-                            enrollment = CourseEnrollment.objects.create(
-                                user=user,
-                                course=group.course,
-                                group=group,
-                                is_active=True
-                            )
-                        except IntegrityError:
-                            # Enrollment уже существует — получаем и обновляем
-                            enrollment = CourseEnrollment.objects.get(
-                                user=user,
-                                course=group.course
-                            )
-                            enrollment.group = group
-                            enrollment.is_active = True
-                            enrollment.save(update_fields=['group', 'is_active'])
-
-                        # Инициализируем прогресс
-                        lessons = Lesson.objects.filter(module__course=group.course).order_by('module__order', 'order')
-                        for lesson in lessons:
-                            progress, created = LessonProgress.get_or_create_safe(
-                                user=user,
-                                lesson=lesson
-                            )
-                            if created:
-                                progress.calculate_available_at()
-
                         enrollment_info = {
                             'course': group.course.title,
                             'group': group.name,
                         }
             except Group.DoesNotExist:
-                pass  # Токен невалидный - игнорируем
+                pass
 
         response_data = {
             'message': 'Пароль успешно установлен. Теперь вы можете войти в систему.',

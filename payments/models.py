@@ -192,8 +192,6 @@ class Order(models.Model):
         Вызывается после успешной авторизации/регистрации.
         """
         from groups.models import GroupMembership
-        from progress.models import CourseEnrollment
-
         if self.status != 'paid':
             return False, 'Заказ не оплачен'
 
@@ -207,28 +205,14 @@ class Order(models.Model):
         self.save()
 
         # Добавляем в группу
+        # CourseEnrollment и LessonProgress создаются автоматически
+        # через сигнал post_save на GroupMembership (groups/signals.py)
         success, message = self.group.add_student(user, enrolled_via_referral=False)
 
         if not success:
             # Если уже в группе — это нормально, продолжаем
             if 'уже в группе' not in message.lower():
                 return False, message
-
-        # Создаём или обновляем зачисление
-        enrollment, created = CourseEnrollment.objects.get_or_create(
-            user=user,
-            course=self.course,
-            defaults={
-                'group': self.group,
-                'is_active': True
-            }
-        )
-
-        if not created:
-            # Если зачисление уже было — обновляем группу и активируем
-            enrollment.group = self.group
-            enrollment.is_active = True
-            enrollment.save()
 
         return True, 'Вы успешно зачислены на курс'
 

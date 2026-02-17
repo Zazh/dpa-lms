@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 def auto_enroll_on_membership_create(sender, instance, created, **kwargs):
     """
     При создании активного GroupMembership автоматически:
-    1. Создать/обновить CourseEnrollment
+    1. Создать/обновить CourseEnrollment (с reset_progress при реактивации)
     2. Инициализировать LessonProgress для всех уроков курса
     """
     if not created or not instance.is_active:
@@ -39,6 +39,23 @@ def auto_enroll_on_membership_create(sender, instance, created, **kwargs):
         )
     except IntegrityError:
         enrollment = CourseEnrollment.objects.get(user=user, course=course)
+
+        # Если enrollment был неактивен (дедлайн истёк) — сбрасываем прогресс,
+        # чтобы незавершённые данные не попали в досье при новом обучении.
+        # Не сбрасываем если студент уже выпускник (Graduate существует).
+        if not enrollment.is_active:
+            from graduates.models import Graduate
+            has_graduated = Graduate.objects.filter(
+                user=user, course=course
+            ).exists()
+
+            if not has_graduated:
+                enrollment.reset_progress()
+                logger.info(
+                    f"Сброшен прогресс: {user.email} → {course.title} "
+                    f"(реактивация после истечения дедлайна)"
+                )
+
         enrollment.group = group
         enrollment.is_active = True
         enrollment.save(update_fields=['group', 'is_active'])

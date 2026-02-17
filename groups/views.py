@@ -3,7 +3,6 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
-from django.db import IntegrityError
 from .models import Group
 from progress.models import CourseEnrollment
 
@@ -97,7 +96,24 @@ class JoinGroupByTokenView(APIView):
             })
 
         # Случай 3: Новое зачисление на курс
+        # Проверяем наличие неактивного enrollment (для сообщения о сбросе прогресса)
+        inactive_enrollment = CourseEnrollment.objects.filter(
+            user=request.user,
+            course=group.course,
+            is_active=False
+        ).first()
+
+        progress_will_reset = False
+        if inactive_enrollment:
+            from graduates.models import Graduate
+            progress_will_reset = not Graduate.objects.filter(
+                user=request.user,
+                course=group.course
+            ).exists()
+
         # Добавляем студента в группу
+        # CourseEnrollment, reset_progress и LessonProgress
+        # создаются автоматически через сигнал post_save на GroupMembership
         success, message = group.add_student(request.user, enrolled_via_referral=True)
 
         if not success:
@@ -106,57 +122,7 @@ class JoinGroupByTokenView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Создаем зачисление на курс (с защитой от race condition)
-        progress_was_reset = False
-        try:
-            enrollment = CourseEnrollment.objects.create(
-                user=request.user,
-                course=group.course,
-                group=group,
-                is_active=True
-            )
-        except IntegrityError:
-            # Enrollment уже существует — получаем и обновляем
-            enrollment = CourseEnrollment.objects.get(
-                user=request.user,
-                course=group.course
-            )
-
-            # Если enrollment был неактивен (дедлайн истёк) — сбрасываем прогресс,
-            # чтобы незавершённые данные не попали в досье при новом обучении.
-            # Не сбрасываем если студент уже выпускник (Graduate существует).
-            if not enrollment.is_active:
-                from graduates.models import Graduate
-                has_graduated = Graduate.objects.filter(
-                    user=request.user,
-                    course=group.course
-                ).exists()
-
-                if not has_graduated:
-                    enrollment.reset_progress()
-                    progress_was_reset = True
-
-            enrollment.group = group
-            enrollment.is_active = True
-            enrollment.save(update_fields=['group', 'is_active'])
-
-        # Инициализируем прогресс для всех уроков
-        from content.models import Lesson
-        from progress.models import LessonProgress
-
-        lessons = Lesson.objects.filter(module__course=group.course).order_by('module__order', 'order')
-
-        for lesson in lessons:
-            # Используем безопасный метод
-            progress, created = LessonProgress.get_or_create_safe(
-                user=request.user,
-                lesson=lesson
-            )
-            # Рассчитываем доступность урока только для новых записей
-            if created:
-                progress.calculate_available_at()
-
-        if progress_was_reset:
+        if progress_will_reset:
             msg = f'Вы добавлены в группу "{group.name}". Прогресс сброшен — начинайте обучение заново.'
         else:
             msg = f'Вы успешно добавлены в группу "{group.name}"'
