@@ -12,3 +12,6 @@ __pycache__/
 
 /server
 celerybeat-schedule
+
+# Claude Code
+.claude/
