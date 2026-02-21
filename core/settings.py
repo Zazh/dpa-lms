@@ -3,6 +3,7 @@ from decouple import config
 from datetime import timedelta
 from celery.schedules import crontab
 import os
+import secrets
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -99,6 +100,9 @@ SPECTACULAR_SETTINGS = {
             }
         ],
 }
+
+# Admin URL (security through obscurity)
+ADMIN_URL = config('ADMIN_URL', default=secrets.token_urlsafe(32))
 
 ROOT_URLCONF = 'core.urls'
 

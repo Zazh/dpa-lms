@@ -1,11 +1,16 @@
+import logging
+
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+logger = logging.getLogger(__name__)
+logger.info("Admin URL: /%s/", settings.ADMIN_URL)
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path(f'{settings.ADMIN_URL}/', admin.site.urls),
 
     # API документация
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
