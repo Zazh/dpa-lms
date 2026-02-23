@@ -400,11 +400,15 @@ def user_quiz_attempts(request):
     """
     Получить историю попыток пользователя
 
-    GET /api/quizzes/attempts/
+    GET /api/quizzes/attempts/?quiz_id=21
     """
     attempts = QuizAttempt.objects.filter(
         user=request.user
     ).select_related('quiz__lesson').order_by('-started_at')
+
+    quiz_id = request.query_params.get('quiz_id')
+    if quiz_id:
+        attempts = attempts.filter(quiz_id=quiz_id)
 
     serializer = QuizAttemptSerializer(attempts, many=True)
     return Response(serializer.data)
