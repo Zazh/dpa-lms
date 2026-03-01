@@ -109,7 +109,7 @@ class ModuleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Module
-        fields = ['id', 'title', 'description', 'order', 'requires_previous_module', 'lessons_count', 'lessons']
+        fields = ['id', 'title', 'description', 'order', 'lessons_count', 'lessons']
 
     def get_lessons_count(self, obj):
         return obj.get_lessons_count()

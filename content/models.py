@@ -1,11 +1,15 @@
+import logging
 import sys
 from io import BytesIO
 
+import requests
 from PIL import Image
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
+
+logger = logging.getLogger(__name__)
 
 
 class Course(models.Model):
@@ -81,12 +85,6 @@ class Module(models.Model):
     description = models.TextField('Описание модуля', blank=True)
 
     order = models.PositiveIntegerField('Порядок', default=0, db_index=True)
-    requires_previous_module = models.BooleanField(
-        'Требует завершения предыдущего модуля',
-        default=True,
-        help_text='⚠️ НЕ ИСПОЛЬЗУЕТСЯ. Логика доступности работает на уровне уроков.'
-    )
-
     created_at = models.DateTimeField('Создан', auto_now_add=True)
     updated_at = models.DateTimeField('Обновлен', auto_now=True)
 
@@ -297,7 +295,9 @@ class VideoLesson(models.Model):
 
     video_duration = models.PositiveIntegerField(
         'Длительность видео (секунды)',
-        validators=[MinValueValidator(1)]
+        blank=True,
+        null=True,
+        help_text='Заполняется автоматически из Vimeo'
     )
 
     completion_threshold = models.PositiveIntegerField(
@@ -331,10 +331,48 @@ class VideoLesson(models.Model):
         return f"Видео: {self.lesson.title}"
 
     def save(self, *args, **kwargs):
-        """Автоматическое сжатие и конвертация обложки в WebP"""
+        """Автоматическое получение duration из Vimeo и сжатие обложки"""
+        # Подтягиваем duration из Vimeo при создании или смене video ID
+        if self.vimeo_video_id:
+            need_fetch = not self.pk  # новый объект
+            if self.pk:
+                try:
+                    old = VideoLesson.objects.get(pk=self.pk)
+                    if old.vimeo_video_id != self.vimeo_video_id:
+                        need_fetch = True  # video ID изменился
+                except VideoLesson.DoesNotExist:
+                    need_fetch = True
+
+            if need_fetch:
+                duration = self._fetch_vimeo_duration()
+                if duration:
+                    self.video_duration = duration
+
         if self.thumbnail:
             self.thumbnail = self._compress_thumbnail(self.thumbnail)
         super().save(*args, **kwargs)
+
+    def _fetch_vimeo_duration(self):
+        """Получить длительность видео из Vimeo API"""
+        token = settings.VIMEO_ACCESS_TOKEN
+        if not token:
+            logger.warning('VIMEO_ACCESS_TOKEN не задан, пропускаем получение duration')
+            return None
+
+        try:
+            resp = requests.get(
+                f'https://api.vimeo.com/videos/{self.vimeo_video_id}',
+                headers={'Authorization': f'Bearer {token}'},
+                params={'fields': 'duration'},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            duration = resp.json().get('duration')
+            logger.info(f'Vimeo video {self.vimeo_video_id}: duration={duration}s')
+            return duration
+        except Exception as e:
+            logger.error(f'Ошибка получения duration из Vimeo: {e}')
+            return None
 
     def _compress_thumbnail(self, image_field):
         """Сжать и конвертировать изображение в WebP"""

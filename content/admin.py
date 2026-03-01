@@ -8,7 +8,7 @@ class ModuleInline(admin.TabularInline):
     """Inline для модулей курса"""
     model = Module
     extra = 0
-    fields = ['order', 'title', 'requires_previous_module', 'lessons_count']
+    fields = ['order', 'title', 'lessons_count']
     readonly_fields = ['lessons_count']
     ordering = ['order']
 
@@ -103,17 +103,14 @@ class LessonInline(admin.TabularInline):
 
 @admin.register(Module)
 class ModuleAdmin(admin.ModelAdmin):
-    list_display = ['title', 'course', 'order', 'requires_previous_badge', 'lessons_count', 'created_at']
-    list_filter = ['course', 'requires_previous_module', 'created_at']
+    list_display = ['title', 'course', 'order', 'lessons_count', 'created_at']
+    list_filter = ['course', 'created_at']
     search_fields = ['title', 'description', 'course__title']
     readonly_fields = ['created_at', 'updated_at', 'lessons_count']
 
     fieldsets = (
         ('Основная информация', {
             'fields': ('course', 'title', 'description', 'order')
-        }),
-        ('Настройки доступа', {
-            'fields': ('requires_previous_module',)
         }),
         ('Статистика', {
             'fields': ('lessons_count',),
@@ -126,13 +123,6 @@ class ModuleAdmin(admin.ModelAdmin):
     )
 
     inlines = [LessonInline]
-
-    def requires_previous_badge(self, obj):
-        if obj.requires_previous_module:
-            return '🔒 Да'
-        return '🔓 Нет'
-
-    requires_previous_badge.short_description = 'Требует предыдущий'
 
     def lessons_count(self, obj):
         if obj.pk:
@@ -147,6 +137,7 @@ class VideoLessonInline(admin.StackedInline):
     model = VideoLesson
     extra = 0
     fields = ['vimeo_video_id', 'video_duration', 'completion_threshold', 'timecodes', 'thumbnail']
+    readonly_fields = ['video_duration']
 
     def has_add_permission(self, request, obj=None):
         # Можно добавить только если тип урока - video
@@ -281,7 +272,7 @@ class LessonAdmin(admin.ModelAdmin):
 class VideoLessonAdmin(admin.ModelAdmin):
     list_display = ['lesson', 'vimeo_video_id', 'formatted_duration', 'completion_threshold']
     search_fields = ['lesson__title', 'vimeo_video_id']
-    readonly_fields = ['formatted_duration', 'embed_url', 'thumbnail_preview']
+    readonly_fields = ['video_duration', 'formatted_duration', 'embed_url', 'thumbnail_preview']
 
     fieldsets = (
         ('Связь с уроком', {
