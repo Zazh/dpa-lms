@@ -367,3 +367,40 @@ class GroupDeactivateExpiredMembershipsTest(GroupTestBase):
             user=self.user, course=self.course,
         )
         self.assertFalse(enrollment.is_active)
+
+    def test_deactivates_group_with_expired_fixed_deadline(self):
+        """Группа с fixed_date и истёкшим deadline_date деактивируется."""
+        group_b2b = Group.objects.create(
+            course=self.course,
+            name='B2B Group',
+            deadline_type='fixed_date',
+            deadline_date=timezone.now() - timedelta(days=1),
+            is_active=True,
+        )
+
+        Group.deactivate_expired_memberships()
+
+        group_b2b.refresh_from_db()
+        self.assertFalse(group_b2b.is_active)
+
+    def test_skips_group_with_future_fixed_deadline(self):
+        """Группа с будущим fixed_date остаётся активной."""
+        group_b2b = Group.objects.create(
+            course=self.course,
+            name='B2B Group Future',
+            deadline_type='fixed_date',
+            deadline_date=timezone.now() + timedelta(days=30),
+            is_active=True,
+        )
+
+        Group.deactivate_expired_memberships()
+
+        group_b2b.refresh_from_db()
+        self.assertTrue(group_b2b.is_active)
+
+    def test_skips_personal_days_group(self):
+        """Группа с personal_days НЕ деактивируется автоматически."""
+        Group.deactivate_expired_memberships()
+
+        self.group.refresh_from_db()
+        self.assertTrue(self.group.is_active)

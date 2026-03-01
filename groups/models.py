@@ -344,6 +344,14 @@ class Group(models.Model):
 
             deactivated_count += 1
 
+        # Деактивируем группы с истекшим фиксированным дедлайном
+        cls.objects.filter(
+            is_active=True,
+            deadline_type='fixed_date',
+            deadline_date__isnull=False,
+            deadline_date__lt=now
+        ).update(is_active=False)
+
         return deactivated_count
 
 class GroupMembership(models.Model):
