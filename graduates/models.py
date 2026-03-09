@@ -295,12 +295,11 @@ class Graduate(models.Model):
         if cls.objects.filter(user=enrollment.user, course=enrollment.course).exists():
             return None
 
-        # Рассчитываем средний балл за тесты (только сданные попытки)
+        # Рассчитываем средний балл за тесты
         quiz_attempts = QuizAttempt.objects.filter(
             user=enrollment.user,
             quiz__lesson__module__course=enrollment.course,
-            status='completed',
-            score_percentage__gte=models.F('quiz__passing_score')
+            status='completed'
         )
 
         avg_quiz_score = quiz_attempts.aggregate(
