@@ -54,7 +54,7 @@
                 <dd class="mt-1 text-sm text-gray-900">{{ group.get_deadline_display }}</dd>
             </div>
             <div>
-                <dt class="text-sm font-medium text-gray-500">Макс. студентов</dt>
+                <dt class="text-sm font-medium text-gray-500">Свободных мест</dt>
                 <dd class="mt-1 text-sm text-gray-900">{{ group.get_available_slots }}</dd>
             </div>
             <div>
@@ -79,6 +79,13 @@
             {% endif %}
         </dl>
     </div>
+</div>
+
+<div class="mb-6">
+    <a href="{% url 'backoffice:group_program' group.id %}"
+       class="inline-flex items-center w-full justify-center px-4 py-3 border border-indigo-300 shadow-sm text-sm font-medium rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition">
+        Открыть прогресс по программе
+    </a>
 </div>
 
 <div class="bg-white shadow overflow-hidden rounded-lg">

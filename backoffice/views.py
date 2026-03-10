@@ -158,6 +158,110 @@ def group_detail(request, group_id):
 
 
 @instructor_or_manager_required
+def group_program(request, group_id):
+    """Программа курса группы — модули с учениками и их прогрессом"""
+
+    from content.models import Module, Lesson
+    from progress.models import LessonProgress
+
+    user = request.user
+    group = get_object_or_404(Group, id=group_id)
+
+    # Проверка доступа
+    if not (user.is_super_instructor() or user.is_manager()):
+        accessible_groups = user.get_accessible_groups()
+        if group not in accessible_groups:
+            messages.error(request, 'У вас нет доступа к этой группе')
+            return redirect('backoffice:groups_list')
+
+    course = group.course
+
+    # Активные студенты группы
+    memberships = GroupMembership.objects.filter(
+        group=group, is_active=True
+    ).select_related('user').order_by('user__last_name')
+
+    students = [m.user for m in memberships]
+    student_ids = [s.id for s in students]
+
+    # Все модули курса с уроками
+    modules = Module.objects.filter(course=course).prefetch_related('lessons').order_by('order')
+
+    # Весь прогресс студентов этой группы по урокам курса
+    all_progress = LessonProgress.objects.filter(
+        user_id__in=student_ids,
+        lesson__module__course=course
+    ).select_related('lesson', 'lesson__module', 'user')
+
+    # Индексируем: {user_id: {lesson_id: lesson_progress}}
+    progress_map = {}
+    for lp in all_progress:
+        progress_map.setdefault(lp.user_id, {})[lp.lesson_id] = lp
+
+    # Собираем данные по модулям
+    modules_data = []
+    for module in modules:
+        lessons = list(module.lessons.all().order_by('order'))
+        lesson_ids = [l.id for l in lessons]
+        total_lessons = len(lessons)
+
+        # Для каждого студента определяем статус по модулю
+        students_on_module = []  # Текущий модуль (в процессе)
+        students_completed = []  # Завершили модуль
+
+        for student in students:
+            user_progress = progress_map.get(student.id, {})
+
+            completed_in_module = 0
+            last_completed_lp = None
+
+            for lesson in lessons:
+                lp = user_progress.get(lesson.id)
+                if lp and lp.is_completed:
+                    completed_in_module += 1
+                    if not last_completed_lp or (lp.completed_at and (not last_completed_lp.completed_at or lp.completed_at > last_completed_lp.completed_at)):
+                        last_completed_lp = lp
+
+            if completed_in_module == total_lessons and total_lessons > 0:
+                # Завершил весь модуль
+                students_completed.append({
+                    'user': student,
+                    'completed_lessons': completed_in_module,
+                    'total_lessons': total_lessons,
+                    'last_ip': last_completed_lp.completed_ip if last_completed_lp else None,
+                    'last_completed_at': last_completed_lp.completed_at if last_completed_lp else None,
+                })
+            elif completed_in_module > 0:
+                # В процессе прохождения этого модуля
+                students_on_module.append({
+                    'user': student,
+                    'completed_lessons': completed_in_module,
+                    'total_lessons': total_lessons,
+                    'last_ip': last_completed_lp.completed_ip if last_completed_lp else None,
+                    'last_completed_at': last_completed_lp.completed_at if last_completed_lp else None,
+                })
+
+        modules_data.append({
+            'module': module,
+            'lessons': lessons,
+            'total_lessons': total_lessons,
+            'students_on_module': students_on_module,
+            'students_completed': students_completed,
+            'active_count': len(students_on_module),
+            'completed_count': len(students_completed),
+        })
+
+    context = {
+        'group': group,
+        'course': course,
+        'modules_data': modules_data,
+        'students_count': len(students),
+    }
+
+    return render(request, 'backoffice/group_program.html', context)
+
+
+@instructor_or_manager_required
 def student_progress(request, user_id, group_id):
     """Прогресс конкретного студента"""
 
