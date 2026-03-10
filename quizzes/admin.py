@@ -202,12 +202,12 @@ class QuizResponseInline(admin.TabularInline):
 
 @admin.register(QuizAttempt)
 class QuizAttemptAdmin(admin.ModelAdmin):
-    list_display = ['user', 'quiz', 'attempt_number', 'status_badge', 'score_badge', 'passed_badge', 'started_at',
-                    'duration']
+    list_display = ['user', 'quiz', 'attempt_number', 'status_badge', 'score_badge', 'passed_badge', 'completed_ip',
+                    'started_at', 'duration']
     list_filter = ['status', 'quiz__lesson__module__course', 'started_at']
     search_fields = ['user__email', 'user__first_name', 'user__last_name', 'quiz__lesson__title']
     readonly_fields = ['user', 'quiz', 'attempt_number', 'status', 'score_percentage', 'started_at', 'completed_at',
-                       'duration_display']
+                       'duration_display', 'completed_ip', 'completed_user_agent']
     date_hierarchy = 'started_at'
 
     fieldsets = (
@@ -216,6 +216,9 @@ class QuizAttemptAdmin(admin.ModelAdmin):
         }),
         ('Результаты', {
             'fields': ('score_percentage', 'started_at', 'completed_at', 'duration_display')
+        }),
+        ('IP / Браузер при сдаче', {
+            'fields': ('completed_ip', 'completed_user_agent')
         }),
     )
 

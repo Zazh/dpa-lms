@@ -174,6 +174,80 @@ class User(AbstractBaseUser, PermissionsMixin):
         super().save(*args, **kwargs)
 
 
+class UserActivityLog(models.Model):
+    """Лог активности пользователя (IP, браузер, действие)"""
+
+    ACTION_CHOICES = [
+        ('login', 'Вход в систему'),
+        ('lesson_completed', 'Урок завершён'),
+        ('quiz_completed', 'Тест завершён'),
+        ('assignment_submitted', 'Задание отправлено'),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='activity_logs',
+        verbose_name='Пользователь'
+    )
+    action = models.CharField('Действие', max_length=30, choices=ACTION_CHOICES, db_index=True)
+    ip_address = models.GenericIPAddressField('IP адрес', null=True, blank=True)
+    user_agent = models.TextField('User Agent', blank=True, default='')
+
+    # Опциональные связи с объектами
+    lesson = models.ForeignKey(
+        'content.Lesson',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Урок'
+    )
+    quiz_attempt = models.ForeignKey(
+        'quizzes.QuizAttempt',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Попытка теста'
+    )
+
+    created_at = models.DateTimeField('Дата', auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Лог активности'
+        verbose_name_plural = 'Логи активности'
+        db_table = 'user_activity_logs'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['user', 'action']),
+        ]
+
+    def __str__(self):
+        return f"{self.user} — {self.get_action_display()} — {self.created_at}"
+
+    @classmethod
+    def log(cls, request, user, action, lesson=None, quiz_attempt=None):
+        """Создать запись лога из request"""
+        ip = cls._get_client_ip(request)
+        ua = request.META.get('HTTP_USER_AGENT', '')
+        return cls.objects.create(
+            user=user,
+            action=action,
+            ip_address=ip,
+            user_agent=ua,
+            lesson=lesson,
+            quiz_attempt=quiz_attempt,
+        )
+
+    @staticmethod
+    def _get_client_ip(request):
+        """Получить реальный IP (с учётом прокси/nginx)"""
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            return x_forwarded_for.split(',')[0].strip()
+        return request.META.get('REMOTE_ADDR')
+
+
 class EmailVerificationToken(models.Model):
     """Токен для подтверждения email и установки пароля"""
 

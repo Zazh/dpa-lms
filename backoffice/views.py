@@ -874,6 +874,8 @@ def backoffice_login(request):
         if user is not None:
             if user.is_backoffice_user():
                 login(request, user)
+                from account.models import UserActivityLog
+                UserActivityLog.log(request, user, 'login')
                 next_url = request.GET.get('next', 'backoffice:dashboard')
                 return redirect(next_url)
             else:

@@ -6,6 +6,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from account.models import UserActivityLog
 from progress.models import LessonProgress
 from .models import QuizLesson, QuizAttempt, QuizResponse, QuizQuestion
 from .serializers import (
@@ -259,7 +260,13 @@ def submit_quiz(request, attempt_id):
                 correct_count += 1
 
         # Завершаем попытку
-        attempt.complete()
+        attempt.complete(request=request)
+
+        # Логируем завершение теста
+        UserActivityLog.log(
+            request, request.user, 'quiz_completed',
+            lesson=attempt.quiz.lesson, quiz_attempt=attempt
+        )
 
         # Проверка: пройден ли тест
         passed = attempt.is_passed()
@@ -288,10 +295,13 @@ def submit_quiz(request, attempt_id):
             )
 
             # Завершаем урок с данными о тесте
-            lesson_progress.mark_completed({
-                'quiz_score': attempt.score_percentage,
-                'quiz_attempt': attempt.attempt_number
-            })
+            lesson_progress.mark_completed(
+                completion_data={
+                    'quiz_score': attempt.score_percentage,
+                    'quiz_attempt': attempt.attempt_number
+                },
+                request=request
+            )
 
             # Получаем enrollment и курс
             course = lesson_progress.lesson.module.course

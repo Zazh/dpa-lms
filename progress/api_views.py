@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from account.models import UserActivityLog
 from content.models import Course, Lesson
 from groups.models import GroupMembership
 from .models import CourseEnrollment, LessonProgress, VideoProgress
@@ -171,8 +172,12 @@ class LessonCompleteView(APIView):
 
             # Завершаем урок (если еще не завершен)
         if not lesson_progress.is_completed:
-            lesson_progress.mark_completed()
+            lesson_progress.mark_completed(request=request)
             # mark_completed() уже пересчитывает прогресс курса
+
+            UserActivityLog.log(
+                request, request.user, 'lesson_completed', lesson=lesson
+            )
 
             # Обновляем enrollment из БД (т.к. mark_completed изменил его)
         enrollment.refresh_from_db()

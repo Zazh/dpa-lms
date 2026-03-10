@@ -290,6 +290,10 @@ class QuizAttempt(models.Model):
     started_at = models.DateTimeField('Начало', auto_now_add=True, db_index=True)
     completed_at = models.DateTimeField('Завершение', null=True, blank=True)
 
+    # IP и браузер при сдаче теста
+    completed_ip = models.GenericIPAddressField('IP при сдаче', null=True, blank=True)
+    completed_user_agent = models.TextField('Браузер при сдаче', blank=True, default='')
+
     class Meta:
         verbose_name = 'Попытка прохождения теста'
         verbose_name_plural = 'Попытки прохождения тестов'
@@ -322,11 +326,18 @@ class QuizAttempt(models.Model):
             return False
         return self.score_percentage >= self.quiz.passing_score
 
-    def complete(self):
+    def complete(self, request=None):
         """Завершить попытку и рассчитать результат"""
         self.score_percentage = self.calculate_score()
         self.status = 'completed'
         self.completed_at = timezone.now()
+
+        # Фиксируем IP и браузер при сдаче
+        if request:
+            x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+            self.completed_ip = x_forwarded.split(',')[0].strip() if x_forwarded else request.META.get('REMOTE_ADDR')
+            self.completed_user_agent = request.META.get('HTTP_USER_AGENT', '')
+
         self.save()
 
         # Обновить прогресс урока если тест пройден

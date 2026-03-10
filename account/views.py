@@ -11,7 +11,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.db import IntegrityError
 
 from notifications.services import EmailService
-from .models import EmailVerificationToken, PasswordResetToken, EgovAuthSession
+from .models import EmailVerificationToken, PasswordResetToken, EgovAuthSession, UserActivityLog
 from .serializers import (
     CheckEmailSerializer,
     UserRegistrationSerializer,
@@ -214,6 +214,9 @@ class LoginView(APIView):
 
         # Генерируем JWT токены
         refresh = RefreshToken.for_user(user)
+
+        # Логируем вход
+        UserActivityLog.log(request, user, 'login')
 
         return Response({
             'refresh': str(refresh),

@@ -291,6 +291,10 @@ class LessonProgress(models.Model):
         help_text='Дополнительная информация (баллы теста, оценка задания и т.д.)'
     )
 
+    # IP и браузер при завершении урока (не перезаписываются)
+    completed_ip = models.GenericIPAddressField('IP при завершении', null=True, blank=True)
+    completed_user_agent = models.TextField('Браузер при завершении', blank=True, default='')
+
     class Meta:
         verbose_name = 'Прогресс по уроку'
         verbose_name_plural = 'Прогресс по урокам'
@@ -327,7 +331,7 @@ class LessonProgress(models.Model):
             obj = cls.objects.get(user=user, lesson=lesson)
             return obj, False
 
-    def mark_completed(self, completion_data=None):
+    def mark_completed(self, completion_data=None, request=None):
         """Отметить урок как завершенный"""
         if not self.is_completed:
             self.is_completed = True
@@ -335,6 +339,12 @@ class LessonProgress(models.Model):
 
             if completion_data:
                 self.completion_data.update(completion_data)
+
+            # Фиксируем IP и браузер при завершении
+            if request:
+                x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+                self.completed_ip = x_forwarded.split(',')[0].strip() if x_forwarded else request.META.get('REMOTE_ADDR')
+                self.completed_user_agent = request.META.get('HTTP_USER_AGENT', '')
 
             self.save()
 

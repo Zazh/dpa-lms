@@ -125,11 +125,12 @@ class CourseEnrollmentAdmin(admin.ModelAdmin):
 
 @admin.register(LessonProgress)
 class LessonProgressAdmin(admin.ModelAdmin):
-    list_display = ['user_info', 'lesson_info', 'completion_badge', 'started_at', 'completed_at', 'duration_display',
-                    'available_badge']
+    list_display = ['user_info', 'lesson_info', 'completion_badge', 'started_at', 'completed_at', 'completed_ip',
+                    'duration_display', 'available_badge']
     list_filter = ['is_completed', 'lesson__lesson_type', 'lesson__module__course', 'completed_at']
     search_fields = ['user__email', 'user__first_name', 'user__last_name', 'lesson__title']
-    readonly_fields = ['started_at', 'completed_at', 'available_at', 'duration_display', 'completion_data_display']
+    readonly_fields = ['started_at', 'completed_at', 'available_at', 'duration_display', 'completion_data_display',
+                       'completed_ip', 'completed_user_agent']
     date_hierarchy = 'completed_at'
 
     fieldsets = (
@@ -138,6 +139,9 @@ class LessonProgressAdmin(admin.ModelAdmin):
         }),
         ('Даты', {
             'fields': ('started_at', 'completed_at', 'available_at', 'duration_display')
+        }),
+        ('IP / Браузер при завершении', {
+            'fields': ('completed_ip', 'completed_user_agent')
         }),
         ('Дополнительно', {
             'fields': ('completion_data', 'completion_data_display'),
