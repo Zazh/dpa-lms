@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -42,7 +43,7 @@ class CourseEnrollment(models.Model):
         max_digits=5,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0), MaxValueValidator(100)]
+        validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('100'))]
     )
 
     completed_lessons_count = models.PositiveIntegerField(
@@ -503,7 +504,7 @@ class VideoProgress(models.Model):
         max_digits=5,
         decimal_places=2,
         default=0,
-        validators=[MinValueValidator(0), MaxValueValidator(100)],
+        validators=[MinValueValidator(Decimal('0')), MaxValueValidator(Decimal('100'))],
         help_text='Максимальный процент просмотра видео'
     )
 
