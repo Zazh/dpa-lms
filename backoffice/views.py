@@ -997,6 +997,8 @@ def instructor_dossier_detail(request, dossier_id):
 
 def backoffice_login(request):
     """Страница входа в backoffice"""
+    from django.core.cache import cache
+    from account.models import UserActivityLog
 
     # Если уже залогинен — редирект
     if request.user.is_authenticated:
@@ -1006,25 +1008,55 @@ def backoffice_login(request):
             messages.error(request, 'У вас нет доступа к backoffice')
             return redirect('backoffice:login')
 
+    email_value = ''
+
     if request.method == 'POST':
-        username = request.POST.get('username')
+        username = request.POST.get('username', '').strip()
         password = request.POST.get('password')
+        email_value = username
+
+        # Honeypot — скрытое поле, бот заполнит, человек нет
+        if request.POST.get('website', ''):
+            return render(request, 'backoffice/login.html', {'email_value': email_value})
+
+        ip = UserActivityLog._get_client_ip(request)
+
+        # Rate limit по IP: 5 попыток за 5 минут
+        ip_key = f'login_attempts_ip_{ip}'
+        ip_attempts = cache.get(ip_key, 0)
+        if ip_attempts >= 5:
+            messages.error(request, 'Слишком много попыток входа. Подождите 5 минут.')
+            return render(request, 'backoffice/login.html', {'email_value': email_value})
+
+        # Rate limit по email: 5 попыток за 5 минут
+        email_key = f'login_attempts_email_{username.lower()}'
+        email_attempts = cache.get(email_key, 0)
+        if email_attempts >= 5:
+            messages.error(request, 'Слишком много попыток входа для этого аккаунта. Подождите 5 минут.')
+            return render(request, 'backoffice/login.html', {'email_value': email_value})
 
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
             if user.is_backoffice_user():
                 login(request, user)
-                from account.models import UserActivityLog
                 UserActivityLog.log(request, user, 'login')
+                cache.delete(ip_key)
+                cache.delete(email_key)
                 next_url = request.GET.get('next', 'backoffice:dashboard')
                 return redirect(next_url)
             else:
+                cache.set(ip_key, ip_attempts + 1, 300)
+                cache.set(email_key, email_attempts + 1, 300)
+                UserActivityLog.log_failed_login(request, username)
                 messages.error(request, 'У вас нет доступа к backoffice. Только для сотрудников.')
         else:
+            cache.set(ip_key, ip_attempts + 1, 300)
+            cache.set(email_key, email_attempts + 1, 300)
+            UserActivityLog.log_failed_login(request, username)
             messages.error(request, 'Неверный email или пароль')
 
-    return render(request, 'backoffice/login.html')
+    return render(request, 'backoffice/login.html', {'email_value': email_value})
 
 
 @backoffice_required

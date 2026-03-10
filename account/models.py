@@ -82,6 +82,19 @@ class User(AbstractBaseUser, PermissionsMixin):
         help_text='Группы, к которым у инструктора есть доступ'
     )
 
+    REGISTRATION_METHOD_CHOICES = [
+        ('email', 'Email'),
+        ('egov', 'eGov'),
+    ]
+
+    registration_method = models.CharField(
+        'Метод регистрации',
+        max_length=10,
+        choices=REGISTRATION_METHOD_CHOICES,
+        default='email',
+        db_index=True,
+    )
+
     is_active = models.BooleanField('Активен', default=True)
     is_staff = models.BooleanField('Сотрудник', default=False)
     is_verified = models.BooleanField('Email подтвержден', default=False)
@@ -179,6 +192,7 @@ class UserActivityLog(models.Model):
 
     ACTION_CHOICES = [
         ('login', 'Вход в систему'),
+        ('login_failed', 'Неудачный вход'),
         ('lesson_completed', 'Урок завершён'),
         ('quiz_completed', 'Тест завершён'),
         ('assignment_submitted', 'Задание отправлено'),
@@ -188,7 +202,15 @@ class UserActivityLog(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name='activity_logs',
-        verbose_name='Пользователь'
+        verbose_name='Пользователь',
+        null=True,
+        blank=True,
+    )
+    attempted_email = models.CharField(
+        'Попытка входа (email)',
+        max_length=255,
+        blank=True,
+        default='',
     )
     action = models.CharField('Действие', max_length=30, choices=ACTION_CHOICES, db_index=True)
     ip_address = models.GenericIPAddressField('IP адрес', null=True, blank=True)
@@ -237,6 +259,19 @@ class UserActivityLog(models.Model):
             user_agent=ua,
             lesson=lesson,
             quiz_attempt=quiz_attempt,
+        )
+
+    @classmethod
+    def log_failed_login(cls, request, attempted_email):
+        """Записать неудачную попытку входа"""
+        ip = cls._get_client_ip(request)
+        ua = request.META.get('HTTP_USER_AGENT', '')
+        return cls.objects.create(
+            user=None,
+            action='login_failed',
+            ip_address=ip,
+            user_agent=ua,
+            attempted_email=attempted_email,
         )
 
     @staticmethod

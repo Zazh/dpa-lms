@@ -494,7 +494,10 @@ class LessonMaterial(models.Model):
     def get_file_size(self):
         """Размер файла в читаемом виде"""
         if self.file:
-            size = self.file.size
+            try:
+                size = self.file.size
+            except (FileNotFoundError, OSError):
+                return None
             for unit in ['Б', 'КБ', 'МБ', 'ГБ']:
                 if size < 1024.0:
                     return f"{size:.1f} {unit}"

@@ -527,7 +527,8 @@ class EgovCompleteRegistrationView(APIView):
             middle_name=session.middle_name or '',
             phone=clean_phone,
             is_active=False,
-            is_verified=False
+            is_verified=False,
+            registration_method='egov',
         )
 
         # Создаём токен для подтверждения email и установки пароля

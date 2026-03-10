@@ -5,13 +5,22 @@ from .models import Course, Module, Lesson, VideoLesson, TextLesson, LessonMater
 class LessonMaterialSerializer(serializers.ModelSerializer):
     """Материалы к уроку"""
     file_size = serializers.SerializerMethodField()
+    file_exists = serializers.SerializerMethodField()
 
     class Meta:
         model = LessonMaterial
-        fields = ['id', 'title', 'description', 'file', 'url', 'order', 'file_size']
+        fields = ['id', 'title', 'description', 'file', 'url', 'order', 'file_size', 'file_exists']
 
     def get_file_size(self, obj):
         return obj.get_file_size()
+
+    def get_file_exists(self, obj):
+        if not obj.file:
+            return False
+        try:
+            return obj.file.storage.exists(obj.file.name)
+        except Exception:
+            return False
 
 
 class CourseListSerializer(serializers.ModelSerializer):
