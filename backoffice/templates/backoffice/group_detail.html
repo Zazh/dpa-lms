@@ -45,8 +45,12 @@
                 <dt class="text-sm font-medium text-gray-500">Тип</dt>
                 <dd class="mt-1 text-sm text-gray-900">
                     {% if group.is_default %}B2C (дефолтная){% else %}B2B{% endif %}
-                    &middot;
-                    {% if group.is_paid %}Платная{% else %}Бесплатная{% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Итоговый тест</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                    {% if group.is_paid %}Без расписания{% else %}По расписанию{% endif %}
                 </dd>
             </div>
             <div>

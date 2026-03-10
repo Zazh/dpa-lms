@@ -31,6 +31,43 @@ def dashboard(request):
         return render(request, 'backoffice/dashboard.html')
 
 
+@backoffice_required
+def team_list(request):
+    """Страница команды — список персонала с последним заходом"""
+
+    from account.models import User, UserActivityLog
+    from django.db.models import Subquery, OuterRef
+
+    user = request.user
+
+    # Доступ только для суперинструктора и суперменеджера
+    if not (user.is_super_instructor() or user.is_super_manager()):
+        messages.error(request, 'Доступ только для суперинструкторов и суперменеджеров')
+        return redirect('backoffice:dashboard')
+
+    # Все сотрудники (не студенты)
+    staff = User.objects.exclude(role='student').order_by('role', 'last_name', 'first_name')
+
+    # Последний лог активности для каждого сотрудника
+    last_logs = UserActivityLog.objects.filter(
+        user_id=OuterRef('pk')
+    ).order_by('-created_at')
+
+    staff = staff.annotate(
+        last_activity_ip=Subquery(last_logs.values('ip_address')[:1]),
+        last_activity_ua=Subquery(last_logs.values('user_agent')[:1]),
+        last_activity_at=Subquery(last_logs.values('created_at')[:1]),
+        last_activity_action=Subquery(last_logs.values('action')[:1]),
+    )
+
+    context = {
+        'staff': staff,
+        'staff_count': staff.count(),
+    }
+
+    return render(request, 'backoffice/team_list.html', context)
+
+
 @instructor_required
 def assignment_detail(request, submission_id):
     """Детали ДЗ + проверка"""

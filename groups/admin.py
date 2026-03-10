@@ -50,10 +50,10 @@ class GroupAdmin(admin.ModelAdmin):
             'fields': ('deadline_type', 'deadline_days', 'deadline_date'),
             'description': 'Для B2C (дефолтных) групп: deadline_days. Для B2B: deadline_date'
         }),
-        ('Итоговый тест (для бесплатных групп)', {
+        ('Расписание итогового теста', {
             'fields': ('final_exam_date', 'final_exam_start_time', 'final_exam_end_time'),
             'classes': ('collapse',),
-            'description': 'Расписание итогового теста. Применяется только если группа НЕ платная (is_paid=False).'
+            'description': 'Применяется если is_paid=False (итоговый тест по расписанию).'
         }),
         ('Ограничения', {
             'fields': ('max_students', 'available_slots_display', 'is_active')

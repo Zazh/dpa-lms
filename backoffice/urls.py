@@ -25,6 +25,9 @@ urlpatterns = [
     path('assignments/', views.assignments_check, name='assignments_check'),
     path('assignments/<int:submission_id>/', views.assignment_detail, name='assignment_detail'),
 
+    # Команда
+    path('team/', views.team_list, name='team_list'),
+
     # Доступ запрещен
     path('no-access/', views.no_access, name='no_access'),
 

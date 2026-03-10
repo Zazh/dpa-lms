@@ -66,14 +66,27 @@
                 </div>
                 <div class="ml-4 flex-shrink-0">
                     {% if progress.is_completed %}
-                    <span class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">✅ Завершен</span>
+                    <span class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Завершен</span>
                     {% elif progress.is_available %}
-                    <span class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">🔓 Доступен</span>
+                    <span class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Доступен</span>
                     {% else %}
-                    <span class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">🔒 Закрыт</span>
+                    <span class="inline-flex px-2 text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Закрыт</span>
                     {% endif %}
                 </div>
             </div>
+            {% if progress.is_completed %}
+            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
+                {% if progress.completed_at %}
+                <span>{{ progress.completed_at|date:"d.m.Y H:i" }}</span>
+                {% endif %}
+                {% if progress.completed_ip %}
+                <span class="font-mono">{{ progress.completed_ip }}</span>
+                {% endif %}
+                {% if progress.completed_user_agent %}
+                <span class="max-w-xs truncate" title="{{ progress.completed_user_agent }}">{{ progress.completed_user_agent|truncatechars:50 }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
         </li>
         {% empty %}
         <li class="px-4 py-8 text-center text-gray-500">Нет данных о прогрессе</li>

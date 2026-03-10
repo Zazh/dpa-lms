@@ -1,0 +1,72 @@
+{% extends "backoffice/base.html" %}
+
+{% block title %}Команда{% endblock %}
+
+{% block content %}
+<div class="bg-white shadow rounded-lg mb-6">
+    <div class="px-4 py-5 sm:p-6">
+        <h1 class="text-2xl font-bold text-gray-900">Команда</h1>
+        <p class="mt-1 text-sm text-gray-500">{{ staff_count }} сотрудников</p>
+    </div>
+</div>
+
+<div class="bg-white shadow overflow-hidden rounded-lg">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Сотрудник</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Роль</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Последний заход</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Браузер</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for member in staff %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div>
+                            <div class="text-sm font-medium text-gray-900">{{ member.get_full_name }}</div>
+                            <div class="text-xs text-gray-500">{{ member.email }}</div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if member.role == 'super_manager' %}
+                        <span class="inline-flex px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-800">Суперменеджер</span>
+                        {% elif member.role == 'super_instructor' %}
+                        <span class="inline-flex px-2 py-0.5 text-xs rounded-full bg-indigo-100 text-indigo-800">Суперинструктор</span>
+                        {% elif member.role == 'manager' %}
+                        <span class="inline-flex px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800">Менеджер</span>
+                        {% elif member.role == 'instructor' %}
+                        <span class="inline-flex px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800">Инструктор</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {% if member.last_activity_at %}
+                            {{ member.last_activity_at|date:"d.m.Y H:i" }}
+                        {% else %}
+                            <span class="text-gray-300">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono">
+                        {{ member.last_activity_ip|default:"-" }}
+                    </td>
+                    <td class="px-6 py-4 text-xs text-gray-400 max-w-xs truncate" title="{{ member.last_activity_ua }}">
+                        {% if member.last_activity_ua %}
+                            {{ member.last_activity_ua|truncatechars:60 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-6 py-8 text-center text-gray-500">Нет сотрудников</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
