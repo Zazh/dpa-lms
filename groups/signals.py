@@ -41,10 +41,11 @@ def auto_enroll_on_membership_create(sender, instance, created, **kwargs):
     except IntegrityError:
         enrollment = CourseEnrollment.objects.get(user=user, course=course)
 
-        # Если enrollment был неактивен (дедлайн истёк) — сбрасываем прогресс,
-        # чтобы незавершённые данные не попали в досье при новом обучении.
+        # Сбрасываем прогресс при переходе в другую группу,
+        # чтобы студент начал обучение заново.
         # Не сбрасываем если студент уже выпускник (Graduate существует).
-        if not enrollment.is_active:
+        old_group = enrollment.group
+        if old_group != group:
             from graduates.models import Graduate
             has_graduated = Graduate.objects.filter(
                 user=user, course=course
@@ -54,7 +55,7 @@ def auto_enroll_on_membership_create(sender, instance, created, **kwargs):
                 enrollment.reset_progress()
                 logger.info(
                     f"Сброшен прогресс: {user.email} → {course.title} "
-                    f"(реактивация после истечения дедлайна)"
+                    f"(перевод из «{old_group.name if old_group else '—'}» в «{group.name}»)"
                 )
 
         enrollment.group = group
